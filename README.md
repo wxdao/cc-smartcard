@@ -1,0 +1,240 @@
+# CC SmartCard
+
+CC SmartCard is a CC: Tweaked add-on for Minecraft 1.21.1 on NeoForge. It adds a programmable Smart Card item and a Smart Card Reader peripheral for ComputerCraft-style access cards, tokens, and small sealed programs.
+
+The core idea is simple: place a blank card in a reader, issue a Lua program onto it once, and then call that program through the reader. Card files live in a world-backed private file system. Computers can call the card, but they cannot browse or copy the card's contents through the reader API.
+
+This is intended as a gameplay-level privacy boundary for ComputerCraft programs, not a formal cryptographic security system.
+
+## Features
+
+- Smart Card item with public card ID, optional label, and issued/blank state.
+- Smart Card Reader block and CC: Tweaked peripheral.
+- Insert a Smart Card by right-clicking any face of the reader with the card. Remove it by right-clicking the reader again.
+- Cards can be issued from a single Lua source string or from a table of files.
+- Issued cards cannot be reissued through the reader API.
+- Card programs run in their own ComputerCraft-style runtime, separate from the calling computer.
+- Card programs have their own world-backed file system storage.
+- Card programs may use familiar ComputerCraft APIs, including the HTTP API when enabled by the server's CC: Tweaked configuration.
+- Card insertion/removal follows ComputerCraft-style peripheral event behavior.
+
+## Requirements
+
+- Minecraft 1.21.1
+- NeoForge 21.1.235 or newer in the 21.1 line
+- CC: Tweaked 1.120.0 or newer
+- Java 21
+
+Install CC SmartCard on the server. For multiplayer, clients should also install it so blocks, items, models, and translations are available.
+
+## Crafting
+
+### Smart Card
+
+Shapeless recipe:
+
+- Paper
+- Redstone Dust
+- Copper Ingot
+
+### Smart Card Reader
+
+Shaped recipe:
+
+```text
+###
+#R#
+#C#
+```
+
+Where:
+
+- `#` = Stone
+- `R` = Redstone Dust, using the `c:dusts/redstone` tag
+- `C` = Copper Ingot
+
+The recipe is also visible through the recipe book or recipe viewer mods such as JEI/EMI when available.
+
+## Quick Start
+
+1. Craft a Smart Card and a Smart Card Reader.
+2. Place the reader next to a CC: Tweaked computer or connect it through a wired modem.
+3. Insert a blank Smart Card into any face of the reader.
+4. Wrap the reader as a peripheral.
+5. Issue a card program.
+6. Call commands on the issued card.
+
+Minimal issuing example from a computer attached to the reader:
+
+```lua
+local reader = peripheral.find("smart_card_reader")
+assert(reader, "No Smart Card Reader found")
+
+local ok, err = reader.issueSource([[
+function handle(command, args, context)
+    if command == "ping" then
+        return true, "pong", context.cardId
+    end
+
+    return nil, "unknown_command"
+end
+]])
+
+assert(ok, err)
+
+local success, message, cardId = reader.call("ping")
+print(success, message, cardId)
+```
+
+CC SmartCard also includes a small ROM helper module, loadable with `require("smartcard")`, for issuing from local files or directories. You may use the reader API directly or use the helper when packaging a card program from files on a computer.
+
+## Use Case Ideas
+
+Smart Cards are useful when you want an in-world item to carry a private program and a little private storage, while exposing only a command interface to other computers.
+
+- Bank cards: issue a card with an account ID and private verification logic. An ATM or shop terminal can call `reader.call("authorize", { amount = 25, nonce = "..." })`, and the card can return a signed or otherwise validated response. Other players can read the public card ID, but they cannot clone the card through the supported reader API because the card program and stored secret are not exposed.
+- Parcel pickup tokens: a warehouse computer can call `reader.call("claim", parcelId)` and let the card decide whether that parcel may be released.
+- Train tickets or event passes: gates can call `reader.call("validate", stationOrVenue)` and optionally let the card mark itself as used by writing to its own storage.
+- Room keys and access badges: doors can call `reader.call("access", doorId)` and open only when the card program accepts the requested door.
+- Loyalty or coupon cards: shops can call `reader.call("stamp", shopId)` or `reader.call("redeem", offerId)` while the card tracks its own points or redemption state.
+
+For gameplay systems like banking, the usual pattern is to keep the issuer's source code and secrets private, issue each card once, and make readers call narrow commands such as `authorize`, `debit`, `validate`, or `claim`. Avoid adding a command which simply returns the card's secret data.
+
+## Reader API
+
+The Smart Card Reader peripheral type is `smart_card_reader`.
+
+### `hasCard()`
+
+Returns `true` when a Smart Card is inserted, otherwise `false`.
+
+### `getCardId()`
+
+Returns the public numeric card ID for the inserted card, or `nil` if no card is inserted. A blank card may receive an ID the first time one is needed.
+
+### `getLabel()`
+
+Returns the card label, or `nil` if no card is inserted or no label is set.
+
+### `setLabel(label)`
+
+Sets the public card label. Returns:
+
+```lua
+true
+```
+
+On failure, returns:
+
+```lua
+nil, errorCode[, detail]
+```
+
+### `isIssued()`
+
+Returns `true` for an issued card, `false` for a blank inserted card, or `nil` if no card is inserted.
+
+### `issueSource(source)`
+
+Issues a blank card using `source` as `/main.lua`.
+
+On success:
+
+```lua
+true
+```
+
+On failure:
+
+```lua
+nil, errorCode[, detail]
+```
+
+Common error codes include `no_card`, `already_issued`, `bad_files`, `no_server`, and `io_error`.
+
+### `issueFiles(files)`
+
+Issues a blank card from a table of file contents. Keys are absolute card paths and values are text contents.
+
+```lua
+reader.issueFiles({
+    ["/main.lua"] = "...",
+    ["/lib/util.lua"] = "..."
+})
+```
+
+Rules:
+
+- The table must include `/main.lua`.
+- Paths must start with `/`.
+- Paths must not contain `..`.
+- Directory entries are not represented.
+- File contents must be strings.
+
+### `call(command[, args])`
+
+Runs the issued card's `/main.lua`, finds `handle`, and calls:
+
+```lua
+handle(command, args, context)
+```
+
+Return values from `handle` are returned to the calling computer using normal Lua multiple return values. Reader-level failures return:
+
+```lua
+nil, errorCode[, detail]
+```
+
+Common error codes include `no_card`, `not_issued`, `no_card_id`, `missing_main`, `cancelled`, and `runtime_error`.
+
+## Card Program Layout
+
+A card program is a small file tree stored on the card. The entry file is always:
+
+```text
+/main.lua
+```
+
+When using `issueSource`, the source string becomes `/main.lua`. When using `issueFiles`, the file table is copied into the card's private storage.
+
+`/main.lua` must provide a `handle(command, args, context)` function. The handler can return any ComputerCraft-serializable Lua values that the runtime supports.
+
+The `context` table includes public call context such as the card's ID and label. Treat it as metadata for gameplay logic, not as a secret.
+
+Card programs run independently from the calling computer. They do not inherit the caller's filesystem, shell session, or peripherals.
+
+## Example: Simple Door Token
+
+Issue this source onto a blank card:
+
+```lua
+function handle(command, args, context)
+    if command == "check" then
+        return args == "front_door", context.cardId
+    end
+
+    return nil, "unknown_command"
+end
+```
+
+Then call it from a computer connected to the reader:
+
+```lua
+local reader = peripheral.find("smart_card_reader")
+local allowed, cardId = reader.call("check", "front_door")
+
+if allowed then
+    print("Access granted for card " .. cardId)
+else
+    print("Access denied")
+end
+```
+
+## Known Limitations
+
+- Card privacy is intended for normal gameplay and ComputerCraft scripts, not as a formal cryptographic security system.
+- Issuing is one-way through the reader API. There is no supported reissue or erase flow in 0.1.0.
+- Card programs are non-transactional. If a program writes files and then errors, earlier writes may remain.
+- Card programs use CC: Tweaked internals for their independent runtime. Future CC: Tweaked updates may require compatibility work.
+- The initial release targets Minecraft 1.21.1, NeoForge 21.1.235, and CC: Tweaked 1.120.0.
+- The reader API intentionally does not expose raw card file contents.

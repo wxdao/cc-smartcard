@@ -1,0 +1,23 @@
+# Changelog
+
+## 0.1.0 - Initial Release
+
+### Added
+
+- Added the Smart Card item.
+- Added the Smart Card Reader block and CC: Tweaked peripheral.
+- Added one-time card issuing from `issueSource(source)` or `issueFiles(files)`.
+- Added card command calls through `reader.call(command, args)`.
+- Added independent ComputerCraft-style card program execution with `/main.lua` and `handle(command, args, context)`.
+- Added world-backed private card file storage.
+- Added public card ID and card label metadata.
+- Added HTTP API support for card programs, following the server's CC: Tweaked HTTP configuration.
+- Added Smart Card and Smart Card Reader crafting recipes.
+- Added a small `smartcard` ROM helper module for issuing from local files or directories.
+
+### Known Limitations
+
+- Card contents are hidden from normal reader API access, but this is gameplay privacy rather than formal cryptographic security.
+- Issued cards cannot be erased or reissued through the reader API.
+- Card commands are non-transactional; file writes made before an error may remain.
+- The card runtime depends on CC: Tweaked internals and may need maintenance for future CC: Tweaked versions.

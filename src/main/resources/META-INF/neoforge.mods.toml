@@ -8,7 +8,7 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="wxdao"
 description='''
-Adds a CC: Tweaked smart card reader peripheral scaffold.
+Adds programmable smart cards and reader peripherals for CC: Tweaked.
 '''
 
 [[dependencies.${mod_id}]]
