@@ -1,0 +1,34 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# Minecraft/NeoForge dev runtime
+run/
+logs/
+crash-reports/
+
+# IDEs/editors
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.factorypath
+
+# Java/runtime dumps
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+*.hprof
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Codex/local scratch
+.codex-tmp/

@@ -1,0 +1,63 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "cc_smartcard:block/smart_card_reader"
+      }
+    },
+    {
+      "when": {
+        "has_card": "true",
+        "card_face": "up"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/smart_card_reader_card_up"
+      }
+    },
+    {
+      "when": {
+        "has_card": "true",
+        "card_face": "down"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/smart_card_reader_card_down"
+      }
+    },
+    {
+      "when": {
+        "has_card": "true",
+        "card_face": "north"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/smart_card_reader_card_north"
+      }
+    },
+    {
+      "when": {
+        "has_card": "true",
+        "card_face": "south"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/smart_card_reader_card_south"
+      }
+    },
+    {
+      "when": {
+        "has_card": "true",
+        "card_face": "west"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/smart_card_reader_card_west"
+      }
+    },
+    {
+      "when": {
+        "has_card": "true",
+        "card_face": "east"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/smart_card_reader_card_east"
+      }
+    }
+  ]
+}

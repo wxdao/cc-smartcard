@@ -1,0 +1,20 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "cutout",
+  "textures": {
+    "card": "cc_smartcard:block/smart_card_reader_card"
+  },
+  "elements": [
+    {
+      "from": [2, 5, -0.5],
+      "to": [14, 11, 0],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 16], "texture": "#card" },
+        "down": { "uv": [2, 14, 14, 15], "texture": "#card" },
+        "up": { "uv": [2, 14, 14, 15], "texture": "#card" },
+        "west": { "uv": [4, 14, 12, 15], "texture": "#card" },
+        "east": { "uv": [4, 14, 12, 15], "texture": "#card" }
+      }
+    }
+  ]
+}

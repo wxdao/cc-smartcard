@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "#": {
+      "item": "minecraft:stone"
+    },
+    "C": {
+      "item": "minecraft:copper_ingot"
+    },
+    "R": {
+      "tag": "c:dusts/redstone"
+    }
+  },
+  "pattern": [
+    "###",
+    "#R#",
+    "#C#"
+  ],
+  "result": {
+    "count": 1,
+    "id": "cc_smartcard:smart_card_reader"
+  }
+}
