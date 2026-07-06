@@ -37,6 +37,8 @@ Before pushing a release tag:
 
 The tag workflow runs `./gradlew clean build runGameTestServer`, syncs the Modrinth body, then publishes the built jar with version type `beta`.
 
+The release workflow disables the Gradle User Home cache. This makes publishing a little slower, but avoids releasing from a stale or partially restored NeoForge userdev cache.
+
 ## Manual Publishing
 
 The `Publish to Modrinth` workflow can also be run manually with `workflow_dispatch`.
