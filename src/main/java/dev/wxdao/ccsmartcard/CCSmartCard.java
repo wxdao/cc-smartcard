@@ -4,6 +4,7 @@ import dev.wxdao.ccsmartcard.block.ModBlockEntities;
 import dev.wxdao.ccsmartcard.block.ModBlocks;
 import dev.wxdao.ccsmartcard.block.entity.FingerprintScannerBlockEntity;
 import dev.wxdao.ccsmartcard.block.entity.SmartCardReaderBlockEntity;
+import dev.wxdao.ccsmartcard.recipe.ModRecipes;
 import dan200.computercraft.api.peripheral.PeripheralCapability;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import net.neoforged.fml.ModContainer;
@@ -19,6 +20,7 @@ public final class CCSmartCard {
     public CCSmartCard(IEventBus modEventBus, ModContainer modContainer) {
         ModBlocks.register(modEventBus);
         ModBlockEntities.register(modEventBus);
+        ModRecipes.register(modEventBus);
         modContainer.registerConfig(Type.SERVER, ModConfig.SPEC);
 
         modEventBus.addListener(this::registerCapabilities);

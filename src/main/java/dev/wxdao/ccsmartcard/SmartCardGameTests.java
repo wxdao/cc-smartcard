@@ -5,6 +5,8 @@ import dev.wxdao.ccsmartcard.block.FingerprintScannerBlock;
 import dev.wxdao.ccsmartcard.block.SmartCardReaderBlock;
 import dev.wxdao.ccsmartcard.block.entity.FingerprintScannerBlockEntity;
 import dev.wxdao.ccsmartcard.block.entity.SmartCardReaderBlockEntity;
+import dev.wxdao.ccsmartcard.item.CardColours;
+import dev.wxdao.ccsmartcard.item.SmartCardItem;
 import dev.wxdao.ccsmartcard.peripheral.FingerprintScannerPeripheral;
 import dev.wxdao.ccsmartcard.peripheral.SmartCardReaderPeripheral;
 import dan200.computercraft.api.filesystem.Mount;
@@ -19,10 +21,17 @@ import dan200.computercraft.api.peripheral.IPeripheral;
 import dan200.computercraft.api.peripheral.WorkMonitor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.NonNullList;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.DyedItemColor;
+import net.minecraft.world.item.crafting.CraftingInput;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -103,6 +112,72 @@ public final class SmartCardGameTests {
         helper.assertTrue(helper.getBlockState(READER_POS).getValue(SmartCardReaderBlock.CARD_FACE) == Direction.NORTH,
                 "Smart Card Reader should store the clicked card face");
 
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void smartCardRecipeCreatesDefaultAndDyedCards(GameTestHelper helper) {
+        ItemStack plain = craft(helper,
+                new ItemStack(Items.PAPER),
+                new ItemStack(Items.REDSTONE),
+                new ItemStack(Items.COPPER_INGOT));
+        helper.assertTrue(SmartCardItem.isSmartCard(plain), "Smart Card recipe should craft a Smart Card");
+        helper.assertFalse(plain.has(DataComponents.DYED_COLOR), "Smart Card recipe without dye should create the default card");
+
+        ItemStack dyed = craft(helper,
+                new ItemStack(Items.PAPER),
+                new ItemStack(Items.REDSTONE),
+                new ItemStack(Items.COPPER_INGOT),
+                new ItemStack(Items.RED_DYE),
+                new ItemStack(Items.BLUE_DYE));
+        CardColours.ColourTracker tracker = new CardColours.ColourTracker();
+        tracker.addColour(DyeColor.RED);
+        tracker.addColour(DyeColor.BLUE);
+        assertDyedColour(helper, dyed, tracker.getColour(), "dyed Smart Card recipe");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void dyeAndClearKeepCardMetadata(GameTestHelper helper) {
+        ItemStack card = metadataCard();
+
+        ItemStack dyed = craft(helper, card.copy(), new ItemStack(Items.RED_DYE));
+        assertCardMetadata(helper, dyed, "dyed card");
+        assertDyedColour(helper, dyed, CardColours.getDyeColour(DyeColor.RED), "dyed card");
+
+        ItemStack cleared = craft(helper, dyed.copy(), new ItemStack(Items.WET_SPONGE));
+        assertCardMetadata(helper, cleared, "cleared card");
+        helper.assertFalse(cleared.has(DataComponents.DYED_COLOR), "Wet Sponge should clear Smart Card dyed colour");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void readerCardPathsKeepDyedColour(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState());
+        SmartCardReaderBlockEntity reader = helper.getBlockEntity(READER_POS);
+        ItemStack card = metadataCard();
+        card.set(DataComponents.DYED_COLOR, new DyedItemColor(CardColours.getDyeColour(DyeColor.CYAN), false));
+
+        helper.assertTrue(reader.insertCard(card.copy(), Direction.WEST),
+                "Smart Card Reader should accept a dyed Smart Card");
+        assertDyedColour(helper, reader.getCard(), CardColours.getDyeColour(DyeColor.CYAN), "inserted reader card");
+
+        ItemStack updateCard = ItemStack.parseOptional(
+                helper.getLevel().registryAccess(),
+                reader.getUpdateTag(helper.getLevel().registryAccess()).getCompound("Card"));
+        assertCardMetadata(helper, updateCard, "reader update tag card");
+        assertDyedColour(helper, updateCard, CardColours.getDyeColour(DyeColor.CYAN), "reader update tag card");
+        helper.assertTrue(reader.getUpdatePacket() != null, "Smart Card Reader should provide a block entity update packet");
+
+        ItemStack removed = reader.removeCard();
+        assertCardMetadata(helper, removed, "removed reader card");
+        assertDyedColour(helper, removed, CardColours.getDyeColour(DyeColor.CYAN), "removed reader card");
+
+        helper.assertTrue(reader.insertCard(removed.copy(), Direction.SOUTH),
+                "Smart Card Reader should reinsert a dyed Smart Card");
+        ItemStack destroyed = reader.removeCardForBlockDestroy();
+        assertCardMetadata(helper, destroyed, "destroyed reader card");
+        assertDyedColour(helper, destroyed, CardColours.getDyeColour(DyeColor.CYAN), "destroyed reader card");
         helper.succeed();
     }
 
@@ -280,6 +355,44 @@ public final class SmartCardGameTests {
         helper.succeedOnTickWhen(15, () -> helper.assertFalse(
                 helper.getBlockState(READER_POS).getValue(FingerprintScannerBlock.LIT),
                 "Fingerprint Scanner should clear its light after 10 ticks from the last scan"));
+    }
+
+    private static ItemStack craft(GameTestHelper helper, ItemStack... stacks) {
+        NonNullList<ItemStack> items = NonNullList.withSize(9, ItemStack.EMPTY);
+        for (int i = 0; i < stacks.length; i++) {
+            items.set(i, stacks[i]);
+        }
+
+        CraftingInput input = CraftingInput.of(3, 3, items);
+        var recipe = helper.getLevel().getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, helper.getLevel());
+        helper.assertTrue(recipe.isPresent(), "Expected a crafting recipe for " + Arrays.toString(stacks));
+        ItemStack result = recipe.orElseThrow().value().assemble(input, helper.getLevel().registryAccess());
+        helper.assertFalse(result.isEmpty(), "Crafting recipe returned an empty result for " + Arrays.toString(stacks));
+        return result;
+    }
+
+    private static ItemStack metadataCard() {
+        ItemStack card = new ItemStack(ModBlocks.SMART_CARD.get());
+        SmartCardItem.setCardId(card, 42);
+        SmartCardItem.setLabel(card, "Test Card");
+        SmartCardItem.setIssued(card, true);
+        return card;
+    }
+
+    private static void assertCardMetadata(GameTestHelper helper, ItemStack stack, String operation) {
+        helper.assertTrue(Integer.valueOf(42).equals(SmartCardItem.getCardId(stack)),
+                operation + " should keep the Card ID");
+        helper.assertTrue("Test Card".equals(SmartCardItem.getLabel(stack)),
+                operation + " should keep the Card Label");
+        helper.assertTrue(SmartCardItem.isIssued(stack), operation + " should keep the Issued state");
+    }
+
+    private static void assertDyedColour(GameTestHelper helper, ItemStack stack, int expectedColour, String operation) {
+        DyedItemColor colour = stack.get(DataComponents.DYED_COLOR);
+        helper.assertTrue(colour != null, operation + " should have a dyed colour");
+        helper.assertTrue(colour.rgb() == expectedColour,
+                operation + " should have colour 0x" + Integer.toHexString(expectedColour)
+                        + ", got 0x" + Integer.toHexString(colour.rgb()));
     }
 
     private static void assertSuccessful(GameTestHelper helper, MethodResult result, String operation) {

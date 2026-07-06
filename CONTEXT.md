@@ -13,6 +13,10 @@ A public number assigned to a smart card when it first needs a persistent identi
 **Card Label**:
 A public name assigned to a smart card by a player or program.
 
+**Card Color**:
+A public visual appearance assigned to a smart card. It may be absent, in which case the card uses its default appearance, and it does not change the card's identity, storage, or program.
+_Avoid_: Card Type, Card Tier
+
 **Card Program**:
 A card's issued behavior, chosen when the card is issued. It determines how the card responds to card commands.
 

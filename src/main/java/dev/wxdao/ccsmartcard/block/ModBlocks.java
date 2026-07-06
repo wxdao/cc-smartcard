@@ -1,9 +1,11 @@
 package dev.wxdao.ccsmartcard.block;
 
 import dev.wxdao.ccsmartcard.CCSmartCard;
+import dev.wxdao.ccsmartcard.item.CardColours;
 import dev.wxdao.ccsmartcard.item.SmartCardItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.chat.Component;
@@ -58,6 +60,9 @@ public final class ModBlocks {
                     .icon(() -> new ItemStack(SMART_CARD.get()))
                     .displayItems((parameters, output) -> {
                         output.accept(SMART_CARD.get());
+                        for (DyeColor dye : DyeColor.values()) {
+                            output.accept(CardColours.createDyedCard(SMART_CARD.get(), dye));
+                        }
                         output.accept(SMART_CARD_READER_ITEM.get());
                         output.accept(FINGERPRINT_SCANNER_ITEM.get());
                     })

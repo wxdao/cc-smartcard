@@ -15,7 +15,6 @@ public final class SmartCardItem extends Item {
     private static final String CARD_ID = "cardId";
     private static final String LABEL = "label";
     private static final String ISSUED = "issued";
-    private static final String COLOR = "color";
 
     public SmartCardItem(Properties properties) {
         super(properties);
@@ -56,11 +55,6 @@ public final class SmartCardItem extends Item {
 
     public static void setIssued(ItemStack stack, boolean issued) {
         updateTag(stack, tag -> tag.putBoolean(ISSUED, issued));
-    }
-
-    public static String getColor(ItemStack stack) {
-        CompoundTag tag = getTag(stack);
-        return tag.contains(COLOR, CompoundTag.TAG_STRING) ? tag.getString(COLOR) : "default";
     }
 
     private static CompoundTag getTag(ItemStack stack) {

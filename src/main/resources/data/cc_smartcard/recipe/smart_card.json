@@ -1,19 +1,4 @@
 {
-  "type": "minecraft:crafting_shapeless",
-  "category": "redstone",
-  "ingredients": [
-    {
-      "item": "minecraft:paper"
-    },
-    {
-      "item": "minecraft:redstone"
-    },
-    {
-      "item": "minecraft:copper_ingot"
-    }
-  ],
-  "result": {
-    "count": 1,
-    "id": "cc_smartcard:smart_card"
-  }
+  "type": "cc_smartcard:smart_card",
+  "category": "redstone"
 }

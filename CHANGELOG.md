@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 - Multi-Colour Smart Cards
+
+### Added
+
+- Added dyeable Smart Cards using Minecraft's `dyed_color` data component.
+- Added optional dye ingredients to the Smart Card crafting recipe.
+- Added CC: Tweaked dyeing and Wet Sponge colour-clearing support for existing Smart Cards.
+- Added dyed Smart Card variants to the creative tab.
+- Added dynamic Smart Card Reader rendering so inserted cards show their dyed colour on the reader.
+
+### Changed
+
+- Smart Card item rendering now uses separate tinted card-body and non-tinted gold-chip layers.
+
 ## 0.2.0 - Fingerprint Scanner
 
 ### Added

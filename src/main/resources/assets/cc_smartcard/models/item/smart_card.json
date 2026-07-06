@@ -1,6 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "cc_smartcard:item/smart_card"
+    "layer0": "cc_smartcard:item/smart_card_body",
+    "layer1": "cc_smartcard:item/smart_card_chip"
   }
 }

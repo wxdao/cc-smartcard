@@ -11,6 +11,9 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -88,7 +91,7 @@ public final class SmartCardReaderBlockEntity extends BlockEntity {
     }
 
     public void updateCardMetadata() {
-        setChanged();
+        setCardChanged();
     }
 
     private void updateCardState(Direction cardFace) {
@@ -104,6 +107,18 @@ public final class SmartCardReaderBlockEntity extends BlockEntity {
                     level.setBlock(worldPosition, updatedState, 3);
                 }
             }
+        }
+        syncCard();
+    }
+
+    private void setCardChanged() {
+        setChanged();
+        syncCard();
+    }
+
+    private void syncCard() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
     }
 
@@ -125,5 +140,15 @@ public final class SmartCardReaderBlockEntity extends BlockEntity {
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.put("Card", card.saveOptional(registries));
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

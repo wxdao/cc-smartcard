@@ -9,6 +9,7 @@ This is intended as a gameplay-level privacy boundary for ComputerCraft programs
 ## Features
 
 - Smart Card item with public card ID, optional label, and issued/blank state.
+- Dyeable Smart Cards with a coloured card body and gold contact chip.
 - Smart Card Reader block and CC: Tweaked peripheral.
 - Fingerprint Scanner block and CC: Tweaked peripheral for player identity scans.
 - Insert a Smart Card by right-clicking any face of the reader with the card. Remove it by right-clicking the reader again.
@@ -37,6 +38,11 @@ Shapeless recipe:
 - Paper
 - Redstone Dust
 - Copper Ingot
+- Optional dye ingredients for a coloured card
+
+Crafting with no dye produces the default white Smart Card. Crafting with one or more dyes produces a dyed Smart Card, mixing multiple dyes in the same style as CC: Tweaked disks.
+
+Existing blank or issued Smart Cards can also be dyed with any dye through CC: Tweaked's dyeable item recipe. Craft a dyed Smart Card with a Wet Sponge to clear the colour. Dyeing or clearing a card keeps its card ID, label, issued state, and private card storage.
 
 ### Smart Card Reader
 
@@ -306,7 +312,7 @@ end
 ## Known Limitations
 
 - Card privacy is intended for normal gameplay and ComputerCraft scripts, not as a formal cryptographic security system.
-- Issuing is one-way through the reader API. There is no supported reissue or erase flow in 0.2.0.
+- Issuing is one-way through the reader API. There is no supported reissue or erase flow.
 - Card programs are non-transactional. If a program writes files and then errors, earlier writes may remain.
 - Card programs use CC: Tweaked internals for their independent runtime. Future CC: Tweaked updates may require compatibility work.
 - The current release targets Minecraft 1.21.1, NeoForge 21.1.235, and CC: Tweaked 1.120.0.
