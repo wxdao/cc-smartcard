@@ -35,9 +35,7 @@ Before pushing a release tag:
 2. Add the matching top section to `CHANGELOG.md`, such as `## 0.2.0 - Fingerprint Scanner`.
 3. Push a tag named `vX.Y.Z`, for example `v0.2.0`.
 
-The tag workflow runs `./gradlew clean build runGameTestServer`, syncs the Modrinth body, then publishes the built jar with version type `beta`.
-
-The release workflow disables the Gradle User Home cache. This makes publishing a little slower, but avoids releasing from a stale or partially restored NeoForge userdev cache.
+The tag workflow runs `./gradlew clean` and then `./gradlew build runGameTestServer`, syncs the Modrinth body, then publishes the built jar with version type `beta`.
 
 ## Manual Publishing
 

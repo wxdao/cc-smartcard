@@ -38,8 +38,6 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-disabled: true
 
       - name: Resolve publish inputs
         run: |
@@ -72,7 +70,9 @@ jobs:
           fi
 
       - name: Build and run game tests
-        run: ./gradlew clean build runGameTestServer
+        run: |
+          ./gradlew clean
+          ./gradlew build runGameTestServer
 
       - name: Sync Modrinth body
         if: env.SYNC_MODRINTH_BODY == 'true'
