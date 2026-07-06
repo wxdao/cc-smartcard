@@ -1,0 +1,63 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "cc_smartcard:block/fingerprint_scanner"
+      }
+    },
+    {
+      "when": {
+        "lit": "true",
+        "lit_face": "up"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/fingerprint_scanner_lit_up"
+      }
+    },
+    {
+      "when": {
+        "lit": "true",
+        "lit_face": "down"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/fingerprint_scanner_lit_down"
+      }
+    },
+    {
+      "when": {
+        "lit": "true",
+        "lit_face": "north"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/fingerprint_scanner_lit_north"
+      }
+    },
+    {
+      "when": {
+        "lit": "true",
+        "lit_face": "south"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/fingerprint_scanner_lit_south"
+      }
+    },
+    {
+      "when": {
+        "lit": "true",
+        "lit_face": "west"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/fingerprint_scanner_lit_west"
+      }
+    },
+    {
+      "when": {
+        "lit": "true",
+        "lit_face": "east"
+      },
+      "apply": {
+        "model": "cc_smartcard:block/fingerprint_scanner_lit_east"
+      }
+    }
+  ]
+}

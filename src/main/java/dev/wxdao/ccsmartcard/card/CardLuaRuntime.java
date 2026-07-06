@@ -438,7 +438,9 @@ public final class CardLuaRuntime {
         long nextApiUpdate = System.nanoTime();
 
         checkCancelled(invocation, machine);
-        handleMachineResult(handleEvent(machine, timeout, null, new Object[0]));
+        MachineResult startupResult = handleEvent(machine, timeout, null, new Object[0]);
+        checkCancelled(invocation, machine);
+        handleMachineResult(startupResult);
         while (!resultApi.result().isDone()) {
             checkCancelled(invocation, machine);
             long now = System.nanoTime();
@@ -452,7 +454,9 @@ public final class CardLuaRuntime {
             CardEvent event = environment.pollEvent(waitMillis(environment, now, nextApiUpdate));
             checkCancelled(invocation, machine);
             if (event != null) {
-                handleMachineResult(handleEvent(machine, timeout, event.name(), event.args()));
+                MachineResult eventResult = handleEvent(machine, timeout, event.name(), event.args());
+                checkCancelled(invocation, machine);
+                handleMachineResult(eventResult);
             }
             if (environment.isStopped() && !resultApi.result().isDone()) {
                 throw new CardRuntimeException("shutdown");

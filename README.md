@@ -1,6 +1,6 @@
 # CC SmartCard
 
-CC SmartCard is a CC: Tweaked add-on for Minecraft 1.21.1 on NeoForge. It adds a programmable Smart Card item and a Smart Card Reader peripheral for ComputerCraft-style access cards, tokens, and small sealed programs.
+CC SmartCard is a CC: Tweaked add-on for Minecraft 1.21.1 on NeoForge. It adds programmable Smart Cards, a Smart Card Reader peripheral, and a Fingerprint Scanner peripheral for ComputerCraft-style access cards, tokens, identity checks, and small sealed programs.
 
 The core idea is simple: place a blank card in a reader, issue a Lua program onto it once, and then call that program through the reader. Card files live in a world-backed private file system. Computers can call the card, but they cannot browse or copy the card's contents through the reader API.
 
@@ -10,6 +10,7 @@ This is intended as a gameplay-level privacy boundary for ComputerCraft programs
 
 - Smart Card item with public card ID, optional label, and issued/blank state.
 - Smart Card Reader block and CC: Tweaked peripheral.
+- Fingerprint Scanner block and CC: Tweaked peripheral for player identity scans.
 - Insert a Smart Card by right-clicking any face of the reader with the card. Remove it by right-clicking the reader again.
 - Cards can be issued from a single Lua source string or from a table of files.
 - Issued cards cannot be reissued through the reader API.
@@ -55,6 +56,23 @@ Where:
 
 The recipe is also visible through the recipe book or recipe viewer mods such as JEI/EMI when available.
 
+### Fingerprint Scanner
+
+Shaped recipe:
+
+```text
+SCS
+RGR
+SCS
+```
+
+Where:
+
+- `S` = Stone
+- `C` = Copper Ingot
+- `R` = Redstone Dust, using the `c:dusts/redstone` tag
+- `G` = Glass Pane
+
 ## Quick Start
 
 1. Craft a Smart Card and a Smart Card Reader.
@@ -88,6 +106,23 @@ print(success, message, cardId)
 
 CC SmartCard also includes a small ROM helper module, loadable with `require("smartcard")`, for issuing from local files or directories. You may use the reader API directly or use the helper when packaging a card program from files on a computer.
 
+## Fingerprint Scanner
+
+The Fingerprint Scanner is a separate CC: Tweaked peripheral for systems that need a live player scan instead of only an item token. Place it next to a computer or connect it with a wired modem, then wrap the peripheral type `fingerprint_scanner`.
+
+When a computer calls `scan()`, the Lua coroutine waits until a player right-clicks the scanner. The block briefly lights the face that was scanned and returns the scanned player's UUID and current game profile name.
+
+```lua
+local scanner = peripheral.find("fingerprint_scanner")
+assert(scanner, "No Fingerprint Scanner found")
+
+print("Waiting for scan...")
+local playerUuid, playerName = scanner.scan()
+print(("Scanned %s (%s)"):format(playerName, playerUuid))
+```
+
+If the scanner is removed or the computer detaches while a scan is pending, the pending scan is cancelled and `scan()` raises an error.
+
 ## Use Case Ideas
 
 Smart Cards are useful when you want an in-world item to carry a private program and a little private storage, while exposing only a command interface to other computers.
@@ -103,6 +138,26 @@ For gameplay systems like banking, the usual pattern is to keep the issuer's sou
 ## Reader API
 
 The Smart Card Reader peripheral type is `smart_card_reader`.
+
+### Reader Events
+
+Card Readers queue ComputerCraft events when a Smart Card is inserted or removed. The event shape follows ComputerCraft's disk events: the first argument is the reader's attachment name, and programs can query public card metadata through the reader API.
+
+```lua
+local event, readerName = os.pullEvent()
+
+if event == "smart_card_inserted" then
+    local reader = peripheral.wrap(readerName)
+    print("Inserted card", reader.getCardId())
+elseif event == "smart_card_removed" then
+    print("Removed card from", readerName)
+end
+```
+
+Events:
+
+- `smart_card_inserted(readerName)`: queued when a card is inserted. If a computer attaches while a card is already present, it also receives this event.
+- `smart_card_removed(readerName)`: queued when a card is removed or dropped because the reader block was destroyed.
 
 ### `hasCard()`
 
@@ -187,6 +242,24 @@ nil, errorCode[, detail]
 
 Common error codes include `no_card`, `not_issued`, `no_card_id`, `missing_main`, `cancelled`, and `runtime_error`.
 
+## Fingerprint Scanner API
+
+The Fingerprint Scanner peripheral type is `fingerprint_scanner`.
+
+### `scan()`
+
+Waits until a player right-clicks the scanner.
+
+On success, returns:
+
+```lua
+playerUuid, playerName
+```
+
+`playerUuid` is the scanned player's UUID string. `playerName` is the player's current game profile name.
+
+If the scanner is broken, replaced, or detached before a player scans it, the pending call is cancelled and raises `scan cancelled`.
+
 ## Card Program Layout
 
 A card program is a small file tree stored on the card. The entry file is always:
@@ -233,8 +306,8 @@ end
 ## Known Limitations
 
 - Card privacy is intended for normal gameplay and ComputerCraft scripts, not as a formal cryptographic security system.
-- Issuing is one-way through the reader API. There is no supported reissue or erase flow in 0.1.0.
+- Issuing is one-way through the reader API. There is no supported reissue or erase flow in 0.2.0.
 - Card programs are non-transactional. If a program writes files and then errors, earlier writes may remain.
 - Card programs use CC: Tweaked internals for their independent runtime. Future CC: Tweaked updates may require compatibility work.
-- The initial release targets Minecraft 1.21.1, NeoForge 21.1.235, and CC: Tweaked 1.120.0.
+- The current release targets Minecraft 1.21.1, NeoForge 21.1.235, and CC: Tweaked 1.120.0.
 - The reader API intentionally does not expose raw card file contents.

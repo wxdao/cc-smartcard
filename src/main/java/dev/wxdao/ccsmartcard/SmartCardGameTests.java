@@ -1,8 +1,11 @@
 package dev.wxdao.ccsmartcard;
 
 import dev.wxdao.ccsmartcard.block.ModBlocks;
+import dev.wxdao.ccsmartcard.block.FingerprintScannerBlock;
 import dev.wxdao.ccsmartcard.block.SmartCardReaderBlock;
+import dev.wxdao.ccsmartcard.block.entity.FingerprintScannerBlockEntity;
 import dev.wxdao.ccsmartcard.block.entity.SmartCardReaderBlockEntity;
+import dev.wxdao.ccsmartcard.peripheral.FingerprintScannerPeripheral;
 import dev.wxdao.ccsmartcard.peripheral.SmartCardReaderPeripheral;
 import dan200.computercraft.api.filesystem.Mount;
 import dan200.computercraft.api.filesystem.WritableMount;
@@ -14,22 +17,17 @@ import dan200.computercraft.api.lua.ObjectArguments;
 import dan200.computercraft.api.peripheral.IComputerAccess;
 import dan200.computercraft.api.peripheral.IPeripheral;
 import dan200.computercraft.api.peripheral.WorkMonitor;
-import dan200.computercraft.core.CoreConfig;
-import dan200.computercraft.core.apis.http.options.Action;
-import dan200.computercraft.core.apis.http.options.AddressRule;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
-import java.util.OptionalInt;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 @PrefixGameTestTemplate(false)
 public final class SmartCardGameTests {
     private static final BlockPos READER_POS = BlockPos.ZERO;
-    private static boolean localHttpRuleInstalled;
     private static final ILuaContext INLINE_MAIN_THREAD_CONTEXT = new ILuaContext() {
         @Override
         public long issueMainThreadTask(LuaTask task) {
@@ -55,7 +52,7 @@ public final class SmartCardGameTests {
     private static final String HTTP_SOURCE = """
             return {
                 handle = function()
-                    local response, err = http.get("http://127.0.0.1:8765/ping.txt")
+                    local response, err = http.get("https://example.com")
                     if not response then
                         return "http_error: " .. tostring(err)
                     end
@@ -72,8 +69,6 @@ public final class SmartCardGameTests {
 
     @GameTest(template = "empty", timeoutTicks = 8000)
     public static void httpRuntimeSmoke(GameTestHelper helper) {
-        allowLocalHttpForGameTest();
-
         helper.setBlock(READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState());
         SmartCardReaderBlockEntity reader = helper.getBlockEntity(READER_POS);
 
@@ -93,7 +88,8 @@ public final class SmartCardGameTests {
             Object[] values = pendingCall.completedResult(helper, computer, "HTTP card call");
             helper.assertTrue(values.length >= 1, "reader.call should return the card result body");
             String body = String.valueOf(values[0]);
-            helper.assertTrue(body.contains("ok"), "Expected HTTP body to contain ok, got: " + body);
+            helper.assertTrue(body.contains("Example Domain"),
+                    "Expected HTTP body to contain Example Domain, got: " + body);
         });
     }
 
@@ -183,16 +179,107 @@ public final class SmartCardGameTests {
         });
     }
 
-    private static void allowLocalHttpForGameTest() {
-        if (localHttpRuleInstalled) {
-            return;
-        }
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void fingerprintScanDoesNotConsumeOldScan(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.FINGERPRINT_SCANNER.get().defaultBlockState());
+        FingerprintScannerBlockEntity scanner = helper.getBlockEntity(READER_POS);
+        FingerprintScannerPeripheral peripheral = (FingerprintScannerPeripheral) scanner.getPeripheral(Direction.NORTH);
+        FakeComputerAccess computer = new FakeComputerAccess();
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
 
-        List<AddressRule> rules = new ArrayList<>();
-        rules.add(AddressRule.parse("127.0.0.1", OptionalInt.of(8765), Action.ALLOW.toPartial()));
-        rules.addAll(CoreConfig.httpRules);
-        CoreConfig.httpRules = List.copyOf(rules);
-        localHttpRuleInstalled = true;
+        peripheral.attach(computer);
+        scanner.scan(player, Direction.NORTH);
+
+        MethodResult call = peripheral.scan(computer);
+        helper.assertTrue(call.getCallback() != null, "scanner.scan should yield until the next scan");
+        Object[] oldEvent = computer.pollEvent("fingerprint_scanner_scan_complete");
+        PendingScan pendingScan = new PendingScan(call);
+        MethodResult afterOldEvent = pendingScan.resume(helper, oldEvent, "old fingerprint scan");
+        helper.assertTrue(afterOldEvent.getCallback() != null, "scanner.scan consumed an old scan event");
+
+        scanner.scan(player, Direction.SOUTH);
+        Object[] values = new PendingScan(afterOldEvent).completedResult(helper, computer, "new fingerprint scan");
+        assertPlayerIdentity(helper, player, values);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void fingerprintScanWakesMultipleWaitingCoroutines(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.FINGERPRINT_SCANNER.get().defaultBlockState());
+        FingerprintScannerBlockEntity scanner = helper.getBlockEntity(READER_POS);
+        FingerprintScannerPeripheral peripheral = (FingerprintScannerPeripheral) scanner.getPeripheral(Direction.NORTH);
+        FakeComputerAccess computer = new FakeComputerAccess();
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+
+        peripheral.attach(computer);
+        PendingScan first = new PendingScan(peripheral.scan(computer));
+        PendingScan second = new PendingScan(peripheral.scan(computer));
+
+        scanner.scan(player, Direction.EAST);
+        Object[] scanEvent = computer.pollEvent("fingerprint_scanner_scan_complete");
+        assertPlayerIdentity(helper, player, first.completedResult(helper, scanEvent, "first fingerprint scan waiter"));
+        assertPlayerIdentity(helper, player, second.completedResult(helper, scanEvent, "second fingerprint scan waiter"));
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void fingerprintScanDetachCancelsPendingScan(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.FINGERPRINT_SCANNER.get().defaultBlockState());
+        FingerprintScannerBlockEntity scanner = helper.getBlockEntity(READER_POS);
+        FingerprintScannerPeripheral peripheral = (FingerprintScannerPeripheral) scanner.getPeripheral(Direction.NORTH);
+        FakeComputerAccess computer = new FakeComputerAccess();
+
+        peripheral.attach(computer);
+        PendingScan pendingScan = new PendingScan(peripheral.scan(computer));
+        peripheral.detach(computer);
+
+        Object[] cancelEvent = computer.pollEvent("fingerprint_scanner_scan_complete");
+        pendingScan.assertErrors(helper, cancelEvent, "scan cancelled", "detached fingerprint scan");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void fingerprintScannerReplacementCancelsPendingScan(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.FINGERPRINT_SCANNER.get().defaultBlockState());
+        FingerprintScannerBlockEntity scanner = helper.getBlockEntity(READER_POS);
+        FingerprintScannerPeripheral peripheral = (FingerprintScannerPeripheral) scanner.getPeripheral(Direction.NORTH);
+        FakeComputerAccess computer = new FakeComputerAccess();
+
+        peripheral.attach(computer);
+        PendingScan pendingScan = new PendingScan(peripheral.scan(computer));
+
+        helper.runAfterDelay(5,
+                () -> helper.setBlock(READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState()));
+
+        helper.succeedWhen(() -> {
+            Object[] cancelEvent = computer.pollEvent("fingerprint_scanner_scan_complete");
+            pendingScan.assertErrors(helper, cancelEvent, "scan cancelled", "replaced fingerprint scanner scan");
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void fingerprintScannerLightsClickedFaceBriefly(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.FINGERPRINT_SCANNER.get().defaultBlockState());
+        FingerprintScannerBlockEntity scanner = helper.getBlockEntity(READER_POS);
+        ServerPlayer player = helper.makeMockServerPlayerInLevel();
+
+        scanner.scan(player, Direction.WEST);
+        helper.assertTrue(helper.getBlockState(READER_POS).getValue(FingerprintScannerBlock.LIT),
+                "Fingerprint Scanner should light after a scan");
+        helper.assertTrue(helper.getBlockState(READER_POS).getValue(FingerprintScannerBlock.LIT_FACE) == Direction.WEST,
+                "Fingerprint Scanner should light the scanned face");
+
+        helper.runAfterDelay(5, () -> scanner.scan(player, Direction.UP));
+        helper.runAfterDelay(6, () -> helper.assertTrue(
+                helper.getBlockState(READER_POS).getValue(FingerprintScannerBlock.LIT_FACE) == Direction.UP,
+                "Fingerprint Scanner should keep the last scanned face lit"));
+        helper.runAfterDelay(14, () -> helper.assertTrue(
+                helper.getBlockState(READER_POS).getValue(FingerprintScannerBlock.LIT),
+                "Fingerprint Scanner should stay lit until 10 ticks after the last scan"));
+
+        helper.succeedOnTickWhen(15, () -> helper.assertFalse(
+                helper.getBlockState(READER_POS).getValue(FingerprintScannerBlock.LIT),
+                "Fingerprint Scanner should clear its light after 10 ticks from the last scan"));
     }
 
     private static void assertSuccessful(GameTestHelper helper, MethodResult result, String operation) {
@@ -200,6 +287,14 @@ public final class SmartCardGameTests {
         boolean success = values.length >= 1 && Boolean.TRUE.equals(values[0]);
         String detail = values.length >= 2 ? String.valueOf(values[1]) : "no detail";
         helper.assertTrue(success, operation + " failed: " + detail);
+    }
+
+    private static void assertPlayerIdentity(GameTestHelper helper, ServerPlayer player, Object[] values) {
+        helper.assertTrue(values.length == 2, "scanner.scan should return UUID and name, got: " + Arrays.toString(values));
+        helper.assertTrue(player.getUUID().toString().equals(values[0]),
+                "scanner.scan returned wrong UUID: " + Arrays.toString(values));
+        helper.assertTrue(player.getGameProfile().getName().equals(values[1]),
+                "scanner.scan returned wrong player name: " + Arrays.toString(values));
     }
 
     private static final class PendingCall {
@@ -225,6 +320,46 @@ public final class SmartCardGameTests {
             } catch (LuaException e) {
                 helper.fail(operation + " failed while resuming: " + e);
                 return new Object[0];
+            }
+        }
+    }
+
+    private static final class PendingScan {
+        private final MethodResult call;
+
+        private PendingScan(MethodResult call) {
+            this.call = call;
+        }
+
+        private Object[] completedResult(GameTestHelper helper, FakeComputerAccess computer, String operation) {
+            Object[] event = computer.pollEvent("fingerprint_scanner_scan_complete");
+            return completedResult(helper, event, operation);
+        }
+
+        private Object[] completedResult(GameTestHelper helper, Object[] event, String operation) {
+            MethodResult completed = resume(helper, event, operation);
+            helper.assertTrue(completed.getCallback() == null, operation + " yielded after completion");
+            return completed.getResult();
+        }
+
+        private MethodResult resume(GameTestHelper helper, Object[] event, String operation) {
+            try {
+                helper.assertTrue(event != null, operation + " has not queued a scanner event yet");
+                return call.getCallback().resume(event);
+            } catch (LuaException e) {
+                helper.fail(operation + " failed while resuming: " + e);
+                return MethodResult.of();
+            }
+        }
+
+        private void assertErrors(GameTestHelper helper, Object[] event, String expectedMessage, String operation) {
+            try {
+                helper.assertTrue(event != null, operation + " has not queued cancellation yet");
+                call.getCallback().resume(event);
+                helper.fail(operation + " completed instead of raising a Lua error");
+            } catch (LuaException e) {
+                helper.assertTrue(expectedMessage.equals(e.getMessage()),
+                        operation + " raised wrong error: " + e.getMessage());
             }
         }
     }

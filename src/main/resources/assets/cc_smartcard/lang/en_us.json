@@ -1,7 +1,10 @@
 {
+  "itemGroup.cc_smartcard": "CC SmartCard",
   "item.cc_smartcard.smart_card": "Smart Card",
   "block.cc_smartcard.smart_card_reader": "Smart Card Reader",
   "item.cc_smartcard.smart_card_reader": "Smart Card Reader",
+  "block.cc_smartcard.fingerprint_scanner": "Fingerprint Scanner",
+  "item.cc_smartcard.fingerprint_scanner": "Fingerprint Scanner",
   "tooltip.cc_smartcard.smart_card.blank": "Blank",
   "tooltip.cc_smartcard.smart_card.issued": "Issued",
   "tooltip.cc_smartcard.smart_card.id": "Card ID: %s",

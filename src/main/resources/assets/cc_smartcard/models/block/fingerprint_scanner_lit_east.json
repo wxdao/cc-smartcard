@@ -1,0 +1,20 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "cutout",
+  "textures": {
+    "lit": "cc_smartcard:block/fingerprint_scanner_lit"
+  },
+  "elements": [
+    {
+      "from": [16, 4, 4],
+      "to": [16.5, 12, 12],
+      "faces": {
+        "east": { "uv": [0, 0, 16, 16], "texture": "#lit" },
+        "down": { "uv": [4, 15, 12, 16], "texture": "#lit" },
+        "up": { "uv": [4, 15, 12, 16], "texture": "#lit" },
+        "north": { "uv": [4, 15, 12, 16], "texture": "#lit" },
+        "south": { "uv": [4, 15, 12, 16], "texture": "#lit" }
+      }
+    }
+  ]
+}

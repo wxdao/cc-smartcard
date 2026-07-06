@@ -2,6 +2,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'net.neoforged.gradle.userdev' version '7.1.38'
+    id 'com.modrinth.minotaur' version '2.9.0'
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -16,6 +17,35 @@ base {
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+def changelogFile = layout.projectDirectory.file('CHANGELOG.md').asFile
+def readCurrentChangelog = {
+    def currentVersion = project.version.toString()
+    def fallback = [
+            title: currentVersion,
+            body : "Release ${currentVersion}."
+    ]
+    if (!changelogFile.isFile()) {
+        throw new GradleException("CHANGELOG.md is required and must contain a section for ## ${currentVersion}")
+    }
+
+    def lines = changelogFile.readLines('UTF-8')
+    def headingIndex = lines.findIndexOf { it ==~ /^##\s+${java.util.regex.Pattern.quote(currentVersion)}(\s+-\s+.+)?\s*$/ }
+    if (headingIndex < 0) {
+        throw new GradleException("CHANGELOG.md must contain a section for ## ${currentVersion}")
+    }
+
+    def nextHeadingIndex = lines.findIndexOf(headingIndex + 1) { it ==~ /^##\s+.+/ }
+    def title = lines[headingIndex].replaceFirst(/^##\s+/, '').trim()
+    def bodyLines = lines.subList(headingIndex + 1, nextHeadingIndex < 0 ? lines.size() : nextHeadingIndex)
+    def body = bodyLines.join('\n').trim()
+    [
+            title: title ?: fallback.title,
+            body : body ?: fallback.body
+    ]
+}
+
+def currentChangelog = readCurrentChangelog()
 
 repositories {
     maven {
@@ -65,6 +95,22 @@ dependencies {
     compileOnly "cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cct_version}"
     compileOnly "cc.tweaked:cobalt:0.9.9"
     localRuntime "cc.tweaked:cc-tweaked-${minecraft_version}-forge:${cct_version}"
+}
+
+modrinth {
+    token = System.getenv('MODRINTH_TOKEN')
+    projectId = findProperty('modrinth.projectId') ?: 'cc-smartcard'
+    versionNumber = project.version.toString()
+    versionName = currentChangelog.title
+    changelog = currentChangelog.body
+    versionType = findProperty('modrinth.versionType') ?: System.getenv('MODRINTH_VERSION_TYPE') ?: 'beta'
+    uploadFile = jar
+    gameVersions = [minecraft_version]
+    loaders = ['neoforge']
+    dependencies {
+        required.project 'cc-tweaked'
+    }
+    syncBodyFrom = layout.projectDirectory.file('README.md').asFile.text
 }
 
 tasks.withType(ProcessResources).configureEach {

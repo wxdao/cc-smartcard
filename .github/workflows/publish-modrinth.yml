@@ -1,0 +1,85 @@
+name: Publish to Modrinth
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: Modrinth version type
+        type: choice
+        options:
+          - release
+          - beta
+          - alpha
+        default: beta
+      sync_body:
+        description: Sync README.md to the Modrinth project body
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve publish inputs
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            version_type="${{ inputs.version_type }}"
+            sync_body="${{ inputs.sync_body }}"
+          else
+            version_type="beta"
+            sync_body="true"
+          fi
+
+          echo "MODRINTH_VERSION_TYPE=${version_type:-beta}" >> "${GITHUB_ENV}"
+          echo "SYNC_MODRINTH_BODY=${sync_body:-true}" >> "${GITHUB_ENV}"
+
+      - name: Verify tag matches Gradle version
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -eu
+          tag_version="${GITHUB_REF_NAME#v}"
+          mod_version="$(sed -n 's/^[[:space:]]*mod_version[[:space:]]*=[[:space:]]*//p' gradle.properties | head -n 1 | tr -d '\r')"
+
+          if [ -z "${mod_version}" ]; then
+            echo "gradle.properties does not define mod_version" >&2
+            exit 1
+          fi
+
+          if [ "${tag_version}" != "${mod_version}" ]; then
+            echo "Tag version ${tag_version} does not match gradle.properties mod_version ${mod_version}" >&2
+            exit 1
+          fi
+
+      - name: Build and run game tests
+        run: ./gradlew clean build runGameTestServer
+
+      - name: Sync Modrinth body
+        if: env.SYNC_MODRINTH_BODY == 'true'
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: ./gradlew modrinthSyncBody
+
+      - name: Publish Modrinth version
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_VERSION_TYPE: ${{ env.MODRINTH_VERSION_TYPE }}
+        run: ./gradlew modrinth

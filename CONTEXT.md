@@ -23,6 +23,14 @@ A private file space identified by a Card ID. It contains the issued card files 
 The in-world device that holds a smart card for issuing and card commands.
 _Avoid_: Card Writer, Card Issuer
 
+**Fingerprint Scanner**:
+The in-world identity device that reports a player's Player Identity when that player scans it.
+_Avoid_: Fingerprint Reader, Identity Reader
+
+**Fingerprint Scan**:
+An interaction with a fingerprint scanner that completes a pending `scan()` call with the player's Player Identity.
+_Avoid_: Player Click, Touch Event
+
 **Issuing**:
 The act of choosing a card program for a blank smart card and locking it in as that card's program.
 _Avoid_: Burning
@@ -30,3 +38,7 @@ _Avoid_: Burning
 **Card Command**:
 A single named operation request from a card reader to a smart card that has been placed in it. The card's program decides the response.
 _Avoid_: Reader Invocation
+
+**Player Identity**:
+The stable UUID string used by identity devices to identify a Minecraft player; the current player name is display metadata only.
+_Avoid_: Player Name as Identity

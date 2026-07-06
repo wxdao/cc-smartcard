@@ -1,6 +1,7 @@
 package dev.wxdao.ccsmartcard.block;
 
 import dev.wxdao.ccsmartcard.CCSmartCard;
+import dev.wxdao.ccsmartcard.block.entity.FingerprintScannerBlockEntity;
 import dev.wxdao.ccsmartcard.block.entity.SmartCardReaderBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -16,6 +17,11 @@ public final class ModBlockEntities {
             BLOCK_ENTITY_TYPES.register("smart_card_reader", () -> BlockEntityType.Builder.of(
                     SmartCardReaderBlockEntity::new,
                     ModBlocks.SMART_CARD_READER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<FingerprintScannerBlockEntity>> FINGERPRINT_SCANNER =
+            BLOCK_ENTITY_TYPES.register("fingerprint_scanner", () -> BlockEntityType.Builder.of(
+                    FingerprintScannerBlockEntity::new,
+                    ModBlocks.FINGERPRINT_SCANNER.get()).build(null));
 
     private ModBlockEntities() {
     }

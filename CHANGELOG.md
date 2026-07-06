@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 - Fingerprint Scanner
+
+### Added
+
+- Added the Fingerprint Scanner block and CC: Tweaked `fingerprint_scanner` peripheral.
+- Added `scan()` support for waiting on an in-world player scan and returning the scanned player's UUID and name.
+- Added the Fingerprint Scanner crafting recipe, item model, block models, textures, and creative tab entry.
+- Added README documentation for Smart Card Reader events.
+- Added a game-test HTTP smoke check against `example.com` for card programs.
+
+### Fixed
+
+- Fixed a CardLuaRuntime cancellation race that could leave cancelled card calls in an inconsistent state.
+
 ## 0.1.0 - Initial Release
 
 ### Added
