@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -60,6 +61,9 @@ public final class CardLuaRuntime {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final long COMPUTER_TICK_NANOS = TimeUnit.MILLISECONDS.toNanos(50);
     private static final int EVENT_QUEUE_LIMIT = 256;
+    private static final int MAX_RANDOM_BYTES = 4096;
+    private static final String RANDOM_BYTES_ARGUMENT_MESSAGE = "n must be an integer between 0 and 4096 bytes";
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private static final ScheduledExecutorService TIMEOUT_EXECUTOR = Executors.newSingleThreadScheduledExecutor(
             new ThreadFactory() {
@@ -407,6 +411,7 @@ public final class CardLuaRuntime {
         apis.add(new PeripheralAPI(environment, context.peripheralMethods()));
         apis.add(new OSAPI(environment));
         apis.add(new HTTPAPI(environment));
+        apis.add(new CardApi());
         apis.add(resultApi);
         return apis;
     }
@@ -924,6 +929,43 @@ public final class CardLuaRuntime {
                 hardAbort = true;
             }
             updateListeners();
+        }
+    }
+
+    private static final class CardApi implements ILuaAPI {
+        @Override
+        public String[] getNames() {
+            return new String[]{"cc_smartcard"};
+        }
+
+        @LuaFunction
+        public final byte[] randomBytes(IArguments arguments) throws LuaException {
+            int length = randomByteCount(arguments);
+            byte[] bytes = new byte[length];
+            if (length > 0) {
+                synchronized (SECURE_RANDOM) {
+                    SECURE_RANDOM.nextBytes(bytes);
+                }
+            }
+            return bytes;
+        }
+
+        private static int randomByteCount(IArguments arguments) throws LuaException {
+            Object raw = arguments.get(0);
+            if (!(raw instanceof Number number)) {
+                throw randomBytesArgumentException();
+            }
+
+            double value = number.doubleValue();
+            if (!Double.isFinite(value) || value != Math.rint(value)
+                    || value < 0 || value > MAX_RANDOM_BYTES) {
+                throw randomBytesArgumentException();
+            }
+            return (int) value;
+        }
+
+        private static LuaException randomBytesArgumentException() {
+            return new LuaException("bad argument #1 (" + RANDOM_BYTES_ARGUMENT_MESSAGE + ")", 2);
         }
     }
 

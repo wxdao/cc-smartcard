@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 - Card Runtime Entropy
+
+### Added
+
+- Added `cc_smartcard.randomBytes(n)` for secure random bytes inside issued Smart Card programs.
+- Added README documentation for the card runtime entropy API and the computer-side `smartcard` helper module.
+
 ## 0.3.1 - Serial Card Commands
 
 ### Fixed

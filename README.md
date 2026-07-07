@@ -16,6 +16,7 @@ The core idea is simple: place a blank card in a reader, issue a Lua program ont
 - Card programs run in their own ComputerCraft-style runtime, separate from the calling computer.
 - Card programs have their own world-backed file system storage.
 - Card programs may use familiar ComputerCraft APIs, including the HTTP API when enabled by the server's CC: Tweaked configuration.
+- Card programs can request secure random bytes from their private runtime.
 - Card insertion/removal follows ComputerCraft-style peripheral event behavior.
 
 ## Requirements
@@ -109,6 +110,20 @@ print(success, message, cardId)
 ```
 
 CC SmartCard also includes a small ROM helper module, loadable with `require("smartcard")`, for issuing from local files or directories. You may use the reader API directly or use the helper when packaging a card program from files on a computer.
+
+```lua
+local smartcard = require("smartcard")
+local reader = peripheral.find("smart_card_reader")
+assert(reader, "No Smart Card Reader found")
+
+-- Issue one local file as /main.lua on the card.
+assert(smartcard.issueFromFile(reader, "cards/door_token.lua"))
+
+-- Or issue a local directory tree. The directory must contain main.lua.
+-- assert(smartcard.issueFromDir(reader, "cards/bank_card"))
+```
+
+The `smartcard` module is intended for computer-side issuing through a reader. It does not expose card runtime APIs and does not add reader peripheral methods.
 
 ## Fingerprint Scanner
 
@@ -245,6 +260,29 @@ nil, errorCode[, detail]
 ```
 
 Common error codes include `no_card`, `not_issued`, `no_card_id`, `missing_main`, `cancelled`, and `runtime_error`.
+
+## Card Runtime API
+
+Card programs also receive a global `cc_smartcard` table while they run inside the smart card runtime. This API is only available to issued card code. It is not a normal computer helper module, not a Smart Card Reader peripheral method, and not part of `require("smartcard")`.
+
+### `cc_smartcard.randomBytes(n)`
+
+Returns `n` secure random bytes as a Lua binary string. The bytes come from the server JVM's secure random source.
+
+```lua
+function handle(command, args, context)
+    if command == "nonce" then
+        return cc_smartcard.randomBytes(32)
+    end
+end
+```
+
+Rules:
+
+- `n` must be an integer from `0` to `4096`.
+- `0` returns an empty binary string.
+- Invalid values raise a Lua argument error containing `n must be an integer between 0 and 4096 bytes`.
+- The returned string may contain any byte, including NUL. Use binary-safe Lua string operations such as `#bytes`, `bytes:byte(i)`, and `string.pack`/`string.unpack`.
 
 ## Fingerprint Scanner API
 

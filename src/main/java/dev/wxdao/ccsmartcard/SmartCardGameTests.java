@@ -73,6 +73,63 @@ public final class SmartCardGameTests {
                 end
             }
             """;
+    private static final String RANDOM_BYTES_SOURCE = """
+            return {
+                handle = function(command, args, context)
+                    if command == "entropy" then
+                        local zero = cc_smartcard.randomBytes(0)
+                        local first = cc_smartcard.randomBytes(32)
+                        local allSame = true
+
+                        for _ = 1, 8 do
+                            if cc_smartcard.randomBytes(32) ~= first then
+                                allSame = false
+                                break
+                            end
+                        end
+
+                        local max = cc_smartcard.randomBytes(4096)
+                        return type(cc_smartcard),
+                            type(cc_smartcard.randomBytes),
+                            #zero,
+                            #first,
+                            #max,
+                            allSame,
+                            cc_smartcard_runtime.command(),
+                            context.cardId == cc_smartcard_runtime.context().cardId
+                    elseif command == "invalid" then
+                        local expected = "n must be an integer between 0 and 4096 bytes"
+
+                        local function expectBad(...)
+                            local ok, err = pcall(cc_smartcard.randomBytes, ...)
+                            if ok then return false, "accepted invalid n" end
+                            err = tostring(err)
+                            if not err:find(expected, 1, true) then return false, err end
+                            return true
+                        end
+
+                        local cases = {
+                            function() return expectBad() end,
+                            function() return expectBad(nil) end,
+                            function() return expectBad(-1) end,
+                            function() return expectBad(1.5) end,
+                            function() return expectBad("4") end,
+                            function() return expectBad(true) end,
+                            function() return expectBad(4097) end,
+                        }
+
+                        for index, check in ipairs(cases) do
+                            local ok, detail = check()
+                            if not ok then return false, index, detail end
+                        end
+
+                        return true
+                    end
+
+                    return "ok", command, args and args.echo, context.cardId
+                end
+            }
+            """;
 
     private SmartCardGameTests() {
     }
@@ -100,6 +157,62 @@ public final class SmartCardGameTests {
             String body = String.valueOf(values[0]);
             helper.assertTrue(body.contains("Example Domain"),
                     "Expected HTTP body to contain Example Domain, got: " + body);
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void cardRuntimeRandomBytesReturnsBinaryStrings(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState());
+        SmartCardReaderBlockEntity reader = helper.getBlockEntity(READER_POS);
+
+        helper.assertTrue(reader.insertCard(new ItemStack(ModBlocks.SMART_CARD.get())),
+                "Smart Card should insert into Smart Card Reader");
+
+        SmartCardReaderPeripheral peripheral = (SmartCardReaderPeripheral) reader.getPeripheral(Direction.NORTH);
+        assertSuccessful(helper, peripheral.issueSource(RANDOM_BYTES_SOURCE), "issueSource");
+
+        FakeComputerAccess computer = new FakeComputerAccess();
+        peripheral.attach(computer);
+        MethodResult call = peripheral.call(computer, INLINE_MAIN_THREAD_CONTEXT, new ObjectArguments("entropy"));
+        helper.assertTrue(call.getCallback() != null, "reader.call should yield while card runtime runs");
+        PendingCall pendingCall = new PendingCall(call);
+
+        helper.succeedWhen(() -> {
+            Object[] values = pendingCall.completedResult(helper, computer, "randomBytes card call");
+            helper.assertTrue(values.length == 8, "randomBytes card call returned: " + Arrays.toString(values));
+            helper.assertTrue("table".equals(values[0]), "cc_smartcard should be a table inside card runtime");
+            helper.assertTrue("function".equals(values[1]), "cc_smartcard.randomBytes should be a function");
+            helper.assertTrue(Double.valueOf(0).equals(values[2]), "randomBytes(0) should return an empty string");
+            helper.assertTrue(Double.valueOf(32).equals(values[3]), "randomBytes(32) should return 32 bytes");
+            helper.assertTrue(Double.valueOf(4096).equals(values[4]), "randomBytes(4096) should return 4096 bytes");
+            helper.assertFalse(Boolean.TRUE.equals(values[5]),
+                    "randomBytes returned the same 32-byte value for every sample");
+            helper.assertTrue("entropy".equals(values[6]), "cc_smartcard_runtime.command() should still work");
+            helper.assertTrue(Boolean.TRUE.equals(values[7]), "cc_smartcard_runtime.context() should still work");
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void cardRuntimeRandomBytesRejectsInvalidLengths(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState());
+        SmartCardReaderBlockEntity reader = helper.getBlockEntity(READER_POS);
+
+        helper.assertTrue(reader.insertCard(new ItemStack(ModBlocks.SMART_CARD.get())),
+                "Smart Card should insert into Smart Card Reader");
+
+        SmartCardReaderPeripheral peripheral = (SmartCardReaderPeripheral) reader.getPeripheral(Direction.NORTH);
+        assertSuccessful(helper, peripheral.issueSource(RANDOM_BYTES_SOURCE), "issueSource");
+
+        FakeComputerAccess computer = new FakeComputerAccess();
+        peripheral.attach(computer);
+        MethodResult call = peripheral.call(computer, INLINE_MAIN_THREAD_CONTEXT, new ObjectArguments("invalid"));
+        helper.assertTrue(call.getCallback() != null, "reader.call should yield while card runtime runs");
+        PendingCall pendingCall = new PendingCall(call);
+
+        helper.succeedWhen(() -> {
+            Object[] values = pendingCall.completedResult(helper, computer, "invalid randomBytes card call");
+            helper.assertTrue(values.length == 1 && Boolean.TRUE.equals(values[0]),
+                    "Expected all invalid randomBytes lengths to fail clearly, got: " + Arrays.toString(values));
         });
     }
 

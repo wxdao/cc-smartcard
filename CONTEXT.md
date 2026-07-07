@@ -43,6 +43,10 @@ _Avoid_: Burning
 A single named operation request from a card reader to a smart card that has been placed in it. The card's program decides the response.
 _Avoid_: Reader Invocation
 
+**Card Runtime Entropy**:
+Secure random bytes available only to a card program while it runs inside the smart card runtime.
+_Avoid_: Computer Random Service, Passport Crypto Helper
+
 **Player Identity**:
 The stable UUID string used by identity devices to identify a Minecraft player; the current player name is display metadata only.
 _Avoid_: Player Name as Identity
