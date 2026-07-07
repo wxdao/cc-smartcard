@@ -32,3 +32,5 @@ Thumbs.db
 
 # Codex/local scratch
 .codex-tmp/
+
+.env
