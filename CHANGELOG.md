@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 - Serial Card Commands
+
+### Fixed
+
+- Fixed Smart Card Reader command scheduling so calls for the same Smart Card ID execute serially.
+- Fixed queued Smart Card calls so detach and reader removal cancellation complete cleanly while calls for different cards can still run in parallel.
+
 ## 0.3.0 - Multi-Colour Smart Cards
 
 ### Added

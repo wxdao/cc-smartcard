@@ -16,7 +16,10 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -43,6 +46,8 @@ public final class SmartCardReaderPeripheral implements IPeripheral {
     private final SmartCardReaderBlockEntity reader;
     private final Map<IComputerAccess, Set<CardLuaRuntime.CardInvocation>> activeInvocations = new IdentityHashMap<>();
     private final AtomicLong nextInvocationId = new AtomicLong();
+    private static final Object CARD_SERIALIZATION_LOCK = new Object();
+    private static final Map<Integer, CardInvocationQueue> cardInvocationQueues = new HashMap<>();
 
     public SmartCardReaderPeripheral(SmartCardReaderBlockEntity reader) {
         this.reader = reader;
@@ -202,19 +207,93 @@ public final class SmartCardReaderPeripheral implements IPeripheral {
 
     private void startInvocation(IComputerAccess computer, CardLuaRuntime.CardInvocation invocation,
             CallContextSnapshot snapshot, String command, Object args) {
+        QueuedCardInvocation queuedInvocation = new QueuedCardInvocation(
+                this, computer, invocation, snapshot, command, args);
+        enqueueInvocation(queuedInvocation);
+    }
+
+    private static void enqueueInvocation(QueuedCardInvocation queuedInvocation) {
+        boolean startNow = false;
+        synchronized (CARD_SERIALIZATION_LOCK) {
+            CardInvocationQueue queue = cardInvocationQueues.computeIfAbsent(
+                    queuedInvocation.snapshot().cardId(), ignored -> new CardInvocationQueue());
+            if (queue.running) {
+                queue.waiting.addLast(queuedInvocation);
+                queuedInvocation.invocation().setCancelAction(() -> cancelQueuedInvocation(queuedInvocation));
+            } else {
+                queue.running = true;
+                startNow = true;
+            }
+        }
+        if (startNow) {
+            runInvocation(queuedInvocation);
+        }
+    }
+
+    private static void cancelQueuedInvocation(QueuedCardInvocation queuedInvocation) {
+        boolean removed = false;
+        synchronized (CARD_SERIALIZATION_LOCK) {
+            CardInvocationQueue queue = cardInvocationQueues.get(queuedInvocation.snapshot().cardId());
+            if (queue != null) {
+                removed = queue.waiting.remove(queuedInvocation);
+                if (!queue.running && queue.waiting.isEmpty()) {
+                    cardInvocationQueues.remove(queuedInvocation.snapshot().cardId());
+                }
+            }
+        }
+        if (removed) {
+            queuedInvocation.invocation().setCancelAction(null);
+            queuedInvocation.peripheral().completeInvocation(
+                    queuedInvocation.computer(), queuedInvocation.invocation(), false, new Object[]{"cancelled"});
+        }
+    }
+
+    private static void runInvocation(QueuedCardInvocation queuedInvocation) {
+        queuedInvocation.invocation().setCancelAction(null);
         CompletableFuture.runAsync(() -> {
-            Object[] eventArgs;
             try {
                 Object[] values = CardLuaRuntime.call(
-                        snapshot.server(), snapshot.cardId(), snapshot.label(), command, args, invocation);
-                eventArgs = completionResult(invocation.id(), true, values);
+                        queuedInvocation.snapshot().server(),
+                        queuedInvocation.snapshot().cardId(),
+                        queuedInvocation.snapshot().label(),
+                        queuedInvocation.command(),
+                        queuedInvocation.args(),
+                        queuedInvocation.invocation());
+                queuedInvocation.peripheral().completeInvocation(
+                        queuedInvocation.computer(), queuedInvocation.invocation(), true, values);
             } catch (Exception e) {
-                eventArgs = completionResult(invocation.id(), false, runtimeErrorValues(e));
+                queuedInvocation.peripheral().completeInvocation(
+                        queuedInvocation.computer(),
+                        queuedInvocation.invocation(),
+                        false,
+                        runtimeErrorValues(e));
             } finally {
-                unregisterInvocation(computer, invocation);
+                releaseInvocation(queuedInvocation);
             }
-            computer.queueEvent(CALL_COMPLETE_EVENT, eventArgs);
         }, INVOCATION_EXECUTOR);
+    }
+
+    private static void releaseInvocation(QueuedCardInvocation queuedInvocation) {
+        QueuedCardInvocation nextInvocation = null;
+        synchronized (CARD_SERIALIZATION_LOCK) {
+            CardInvocationQueue queue = cardInvocationQueues.get(queuedInvocation.snapshot().cardId());
+            if (queue == null) {
+                return;
+            }
+            nextInvocation = queue.waiting.pollFirst();
+            if (nextInvocation == null) {
+                cardInvocationQueues.remove(queuedInvocation.snapshot().cardId());
+            }
+        }
+        if (nextInvocation != null) {
+            runInvocation(nextInvocation);
+        }
+    }
+
+    private void completeInvocation(IComputerAccess computer, CardLuaRuntime.CardInvocation invocation,
+            boolean success, Object[] values) {
+        unregisterInvocation(computer, invocation);
+        computer.queueEvent(CALL_COMPLETE_EVENT, completionResult(invocation.id(), success, values));
     }
 
     private MethodResult waitForInvocation(CardLuaRuntime.CardInvocation invocation) {
@@ -385,6 +464,15 @@ public final class SmartCardReaderPeripheral implements IPeripheral {
     }
 
     private record CallContextSnapshot(MinecraftServer server, int cardId, String label) {
+    }
+
+    private record QueuedCardInvocation(SmartCardReaderPeripheral peripheral, IComputerAccess computer,
+            CardLuaRuntime.CardInvocation invocation, CallContextSnapshot snapshot, String command, Object args) {
+    }
+
+    private static final class CardInvocationQueue {
+        private boolean running;
+        private final Deque<QueuedCardInvocation> waiting = new ArrayDeque<>();
     }
 
     @Override

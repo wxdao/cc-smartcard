@@ -576,7 +576,7 @@ public final class CardLuaRuntime {
             }
         }
 
-        private void setCancelAction(Runnable action) {
+        public void setCancelAction(Runnable action) {
             boolean runNow;
             synchronized (cancelLock) {
                 cancelAction = action;

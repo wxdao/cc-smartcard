@@ -45,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 @PrefixGameTestTemplate(false)
 public final class SmartCardGameTests {
     private static final BlockPos READER_POS = BlockPos.ZERO;
+    private static final BlockPos SECOND_READER_POS = new BlockPos(1, 0, 0);
     private static final ILuaContext INLINE_MAIN_THREAD_CONTEXT = new ILuaContext() {
         @Override
         public long issueMainThreadTask(LuaTask task) {
@@ -251,6 +252,172 @@ public final class SmartCardGameTests {
             Object[] values = pendingCall.completedResult(helper, computer, "removed reader card call");
             helper.assertTrue(values.length >= 2 && values[0] == null && "cancelled".equals(values[1]),
                     "Expected cancelled error after reader removal, got: " + Arrays.toString(values));
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void readerCallsForSameCardAreSerialized(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState());
+        SmartCardReaderBlockEntity reader = helper.getBlockEntity(READER_POS);
+
+        helper.assertTrue(reader.insertCard(new ItemStack(ModBlocks.SMART_CARD.get())),
+                "Smart Card should insert into Smart Card Reader");
+
+        SmartCardReaderPeripheral peripheral = (SmartCardReaderPeripheral) reader.getPeripheral(Direction.NORTH);
+        assertSuccessful(helper, peripheral.issueSource("""
+                return {
+                    handle = function(command)
+                        if command == "first" then
+                            sleep(60)
+                            return "unexpected"
+                        end
+                        return "second"
+                    end
+                }
+                """), "issueSource");
+
+        FakeComputerAccess runningComputer = new FakeComputerAccess();
+        FakeComputerAccess queuedComputer = new FakeComputerAccess();
+        peripheral.attach(runningComputer);
+        peripheral.attach(queuedComputer);
+
+        MethodResult runningCall = peripheral.call(
+                runningComputer, INLINE_MAIN_THREAD_CONTEXT, new ObjectArguments("first"));
+        helper.assertTrue(runningCall.getCallback() != null, "Running card call should yield while card runtime runs");
+        PendingCall running = new PendingCall(runningCall);
+        PendingCall second = new PendingCall(
+                peripheral.call(queuedComputer, INLINE_MAIN_THREAD_CONTEXT, new ObjectArguments("second")));
+        boolean[] runningDetached = {false};
+
+        helper.runAfterDelay(5, () -> {
+            helper.assertTrue(queuedComputer.pollEvent("smart_card_call_complete") == null,
+                    "Second card call completed while the first call for the same card was still running");
+            runningDetached[0] = true;
+            peripheral.detach(runningComputer);
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(runningDetached[0], "Running serialized card call has not been detached yet");
+            Object[] runningValues = running.completedResult(helper, runningComputer, "first serialized cleanup");
+            helper.assertTrue(runningValues.length >= 2 && runningValues[0] == null && "cancelled".equals(runningValues[1]),
+                    "Expected cancelled error while cleaning up first serialized call, got: "
+                            + Arrays.toString(runningValues));
+
+            Object[] secondValues = second.completedResult(helper, queuedComputer, "second serialized card call");
+            helper.assertTrue(secondValues.length == 1 && "second".equals(secondValues[0]),
+                    "Expected second card call to run after the first call was cancelled, got: "
+                            + Arrays.toString(secondValues));
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void readerCallsForDifferentCardsCanRunInParallel(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState());
+        helper.setBlock(SECOND_READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState());
+        SmartCardReaderBlockEntity longReader = helper.getBlockEntity(READER_POS);
+        SmartCardReaderBlockEntity quickReader = helper.getBlockEntity(SECOND_READER_POS);
+
+        helper.assertTrue(longReader.insertCard(new ItemStack(ModBlocks.SMART_CARD.get())),
+                "Long Smart Card should insert into Smart Card Reader");
+        helper.assertTrue(quickReader.insertCard(new ItemStack(ModBlocks.SMART_CARD.get())),
+                "Quick Smart Card should insert into Smart Card Reader");
+
+        SmartCardReaderPeripheral longPeripheral = (SmartCardReaderPeripheral) longReader.getPeripheral(Direction.NORTH);
+        SmartCardReaderPeripheral quickPeripheral = (SmartCardReaderPeripheral) quickReader.getPeripheral(Direction.NORTH);
+        assertSuccessful(helper, longPeripheral.issueSource("""
+                return {
+                    handle = function()
+                        sleep(60)
+                        return "unexpected"
+                    end
+                }
+                """), "issueSource long card");
+        assertSuccessful(helper, quickPeripheral.issueSource("""
+                return {
+                    handle = function()
+                        return "quick"
+                    end
+                }
+                """), "issueSource quick card");
+        helper.assertFalse(SmartCardItem.getCardId(longReader.getCard()).equals(SmartCardItem.getCardId(quickReader.getCard())),
+                "Test setup should use two different Smart Card IDs");
+
+        FakeComputerAccess longComputer = new FakeComputerAccess();
+        FakeComputerAccess quickComputer = new FakeComputerAccess();
+        longPeripheral.attach(longComputer);
+        quickPeripheral.attach(quickComputer);
+
+        MethodResult longCall = longPeripheral.call(longComputer, INLINE_MAIN_THREAD_CONTEXT, new ObjectArguments("long"));
+        helper.assertTrue(longCall.getCallback() != null, "Long card call should yield while card runtime runs");
+        PendingCall pendingLongCall = new PendingCall(longCall);
+        PendingCall pendingQuickCall = new PendingCall(
+                quickPeripheral.call(quickComputer, INLINE_MAIN_THREAD_CONTEXT, new ObjectArguments("quick")));
+        boolean[] longDetached = {false};
+
+        helper.succeedWhen(() -> {
+            Object[] quickValues = pendingQuickCall.completedResult(helper, quickComputer, "quick parallel card call");
+            helper.assertTrue(quickValues.length == 1 && "quick".equals(quickValues[0]),
+                    "Expected quick card call to complete while long card call still runs, got: "
+                            + Arrays.toString(quickValues));
+
+            if (!longDetached[0]) {
+                helper.assertTrue(longComputer.pollEvent("smart_card_call_complete") == null,
+                        "Long card call completed before the quick different-card call was observed");
+                longDetached[0] = true;
+                longPeripheral.detach(longComputer);
+            }
+
+            Object[] longValues = pendingLongCall.completedResult(helper, longComputer, "long parallel card cleanup");
+            helper.assertTrue(longValues.length >= 2 && longValues[0] == null && "cancelled".equals(longValues[1]),
+                    "Expected cancelled error while cleaning up long parallel card call, got: "
+                            + Arrays.toString(longValues));
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 800)
+    public static void detachCancelsQueuedRuntime(GameTestHelper helper) {
+        helper.setBlock(READER_POS, ModBlocks.SMART_CARD_READER.get().defaultBlockState());
+        SmartCardReaderBlockEntity reader = helper.getBlockEntity(READER_POS);
+
+        helper.assertTrue(reader.insertCard(new ItemStack(ModBlocks.SMART_CARD.get())),
+                "Smart Card should insert into Smart Card Reader");
+
+        SmartCardReaderPeripheral peripheral = (SmartCardReaderPeripheral) reader.getPeripheral(Direction.NORTH);
+        assertSuccessful(helper, peripheral.issueSource("""
+                return {
+                    handle = function()
+                        sleep(60)
+                        return "unexpected"
+                    end
+                }
+                """), "issueSource");
+
+        FakeComputerAccess runningComputer = new FakeComputerAccess();
+        FakeComputerAccess queuedComputer = new FakeComputerAccess();
+        peripheral.attach(runningComputer);
+        peripheral.attach(queuedComputer);
+
+        MethodResult runningCall = peripheral.call(
+                runningComputer, INLINE_MAIN_THREAD_CONTEXT, new ObjectArguments("running"));
+        helper.assertTrue(runningCall.getCallback() != null, "Running card call should yield while card runtime runs");
+        PendingCall running = new PendingCall(runningCall);
+        PendingCall queued = new PendingCall(
+                peripheral.call(queuedComputer, INLINE_MAIN_THREAD_CONTEXT, new ObjectArguments("queued")));
+
+        peripheral.detach(queuedComputer);
+
+        Object[] values = queued.completedResult(helper, queuedComputer, "queued detached card call");
+        helper.assertTrue(values.length >= 2 && values[0] == null && "cancelled".equals(values[1]),
+                "Expected cancelled error after queued detach, got: " + Arrays.toString(values));
+        helper.assertTrue(runningComputer.pollEvent("smart_card_call_complete") == null,
+                "Cancelling queued call should not complete the running call");
+
+        peripheral.detach(runningComputer);
+        helper.succeedWhen(() -> {
+            Object[] runningValues = running.completedResult(helper, runningComputer, "running queued-test cleanup");
+            helper.assertTrue(runningValues.length >= 2 && runningValues[0] == null && "cancelled".equals(runningValues[1]),
+                    "Expected cancelled error while cleaning up running queued-test call, got: "
+                            + Arrays.toString(runningValues));
         });
     }
 
