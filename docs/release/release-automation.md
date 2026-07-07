@@ -14,10 +14,9 @@ Create a repository secret named `MODRINTH_TOKEN` in:
 
 `wxdao/cc-smartcard` -> Settings -> Secrets and variables -> Actions -> New repository secret
 
-The token needs these Modrinth scopes:
+The GitHub secret used by the publish workflow needs this Modrinth scope:
 
 - `CREATE_VERSION`, to publish versions.
-- `PROJECT_WRITE`, because the workflow syncs `README.md` to the Modrinth project body by default.
 
 If the GitHub CLI is logged in locally, this command can set the secret without printing the token:
 
@@ -35,17 +34,29 @@ Before pushing a release tag:
 2. Add the matching top section to `CHANGELOG.md`, such as `## 0.2.0 - Fingerprint Scanner`.
 3. Push a tag named `vX.Y.Z`, for example `v0.2.0`.
 
-The tag workflow runs `./gradlew clean` and then `./gradlew build runGameTestServer`, syncs the Modrinth body, then publishes the built jar with version type `beta`.
+The workflow runs `./gradlew build runGameTestServer` on `main` pushes, release tags, and manual runs. Only release tags and manual runs publish a Modrinth version; `main` pushes exist to validate the default branch and keep caches warm. The workflow does not run `clean` so the restored NeoForm cache under `build/neoForm` remains available. GitHub runners start from a fresh checkout, and `build/libs` is not cached, so the published jar is still produced from the current source. For a fully cold build, clear the relevant GitHub Actions caches or run `./gradlew clean` locally.
+
+GitHub Actions uses two cache layers for release builds. `gradle/actions/setup-gradle` caches Gradle User Home; tag builds read that cache, while `main` and manual runs can write it so the default branch stays warm. A separate `actions/cache` entry stores NeoGradle/UserDev workspace state from `.gradle/repositories`, `.gradle/caches/minecraft`, and `build/neoForm`, keyed by runner OS, MC/NeoForge/CC:T/Parchment versions, and Gradle build configuration files. Tag builds restore this cache but do not save tag-scoped entries. The key is intentionally not based on `mod_version`, because release version bumps do not invalidate the NeoGradle workspace. If these caches miss or expire, the next `main` or manual run will rebuild and prewarm them.
+
+## Syncing The Modrinth Body
+
+Sync the Modrinth project body from `README.md` locally instead of through GitHub Actions:
+
+```sh
+scripts/sync-modrinth-body.sh
+```
+
+The script loads `.env` from the repository root when it exists, so local tokens can be stored there. This local token needs `PROJECT_WRITE`:
+
+```sh
+MODRINTH_TOKEN=...
+```
 
 ## Manual Publishing
 
 The `Publish to Modrinth` workflow can also be run manually with `workflow_dispatch`.
-To sync only the Modrinth project body from `README.md`, run it with `sync_body=true` and `publish_version=false`.
 
-Manual runs can choose:
-
-- Version type: `release`, `beta`, or `alpha`.
-- Whether to sync `README.md` to the Modrinth project body.
+Manual runs can choose version type: `release`, `beta`, or `alpha`.
 
 ## Local Checks
 
@@ -55,4 +66,4 @@ Use this to verify the Minotaur tasks are registered:
 ./gradlew tasks --all | rg modrinth
 ```
 
-Do not run `./gradlew modrinth` or `./gradlew modrinthSyncBody` locally unless `MODRINTH_TOKEN` is intentionally set for publishing.
+Do not run `./gradlew modrinth` locally unless `MODRINTH_TOKEN` is intentionally set for publishing.

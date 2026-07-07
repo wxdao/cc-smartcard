@@ -2,6 +2,8 @@ name: Publish to Modrinth
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -14,14 +16,6 @@ on:
           - beta
           - alpha
         default: beta
-      sync_body:
-        description: Sync README.md to the Modrinth project body
-        type: boolean
-        default: true
-      publish_version:
-        description: Publish a Modrinth version
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -42,22 +36,68 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Resolve NeoGradle cache inputs
+        run: |
+          set -eu
+
+          read_property() {
+            awk -v key="$1" '
+              index($0, "=") {
+                name = substr($0, 1, index($0, "=") - 1)
+                value = substr($0, index($0, "=") + 1)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+                if (name == key) {
+                  print value
+                  exit
+                }
+              }
+            ' gradle.properties | tr -d '\r'
+          }
+
+          write_cache_input() {
+            env_name="$1"
+            property_name="$2"
+            value="$(read_property "${property_name}")"
+
+            if [ -z "${value}" ]; then
+              echo "gradle.properties does not define ${property_name}" >&2
+              exit 1
+            fi
+
+            echo "${env_name}=${value}" >> "${GITHUB_ENV}"
+          }
+
+          write_cache_input NEOGRADLE_CACHE_MINECRAFT_VERSION minecraft_version
+          write_cache_input NEOGRADLE_CACHE_NEO_VERSION neo_version
+          write_cache_input NEOGRADLE_CACHE_CCT_VERSION cct_version
+          write_cache_input NEOGRADLE_CACHE_PARCHMENT_MINECRAFT_VERSION neogradle.subsystems.parchment.minecraftVersion
+          write_cache_input NEOGRADLE_CACHE_PARCHMENT_MAPPINGS_VERSION neogradle.subsystems.parchment.mappingsVersion
+
+      - name: Restore NeoGradle workspace state
+        id: neogradle-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .gradle/repositories
+            .gradle/caches/minecraft
+            build/neoForm
+          key: neogradle-workspace-${{ runner.os }}-mc${{ env.NEOGRADLE_CACHE_MINECRAFT_VERSION }}-neo${{ env.NEOGRADLE_CACHE_NEO_VERSION }}-cct${{ env.NEOGRADLE_CACHE_CCT_VERSION }}-parchment-mc${{ env.NEOGRADLE_CACHE_PARCHMENT_MINECRAFT_VERSION }}-mappings${{ env.NEOGRADLE_CACHE_PARCHMENT_MAPPINGS_VERSION }}-${{ hashFiles('settings.gradle', 'build.gradle', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            neogradle-workspace-${{ runner.os }}-mc${{ env.NEOGRADLE_CACHE_MINECRAFT_VERSION }}-neo${{ env.NEOGRADLE_CACHE_NEO_VERSION }}-cct${{ env.NEOGRADLE_CACHE_CCT_VERSION }}-parchment-mc${{ env.NEOGRADLE_CACHE_PARCHMENT_MINECRAFT_VERSION }}-mappings${{ env.NEOGRADLE_CACHE_PARCHMENT_MAPPINGS_VERSION }}-
 
       - name: Resolve publish inputs
         run: |
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             version_type="${{ inputs.version_type }}"
-            sync_body="${{ inputs.sync_body }}"
-            publish_version="${{ inputs.publish_version }}"
           else
             version_type="beta"
-            sync_body="true"
-            publish_version="true"
           fi
 
           echo "MODRINTH_VERSION_TYPE=${version_type:-beta}" >> "${GITHUB_ENV}"
-          echo "SYNC_MODRINTH_BODY=${sync_body:-true}" >> "${GITHUB_ENV}"
-          echo "PUBLISH_MODRINTH_VERSION=${publish_version:-true}" >> "${GITHUB_ENV}"
 
       - name: Verify tag matches Gradle version
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -77,18 +117,20 @@ jobs:
           fi
 
       - name: Build and run game tests
-        run: |
-          ./gradlew clean
-          ./gradlew build runGameTestServer
+        run: ./gradlew build runGameTestServer
 
-      - name: Sync Modrinth body
-        if: env.SYNC_MODRINTH_BODY == 'true'
-        env:
-          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-        run: ./gradlew modrinthSyncBody
+      - name: Save NeoGradle workspace state
+        if: github.ref == 'refs/heads/main' && steps.neogradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .gradle/repositories
+            .gradle/caches/minecraft
+            build/neoForm
+          key: neogradle-workspace-${{ runner.os }}-mc${{ env.NEOGRADLE_CACHE_MINECRAFT_VERSION }}-neo${{ env.NEOGRADLE_CACHE_NEO_VERSION }}-cct${{ env.NEOGRADLE_CACHE_CCT_VERSION }}-parchment-mc${{ env.NEOGRADLE_CACHE_PARCHMENT_MINECRAFT_VERSION }}-mappings${{ env.NEOGRADLE_CACHE_PARCHMENT_MAPPINGS_VERSION }}-${{ hashFiles('settings.gradle', 'build.gradle', 'gradle/wrapper/gradle-wrapper.properties') }}
 
       - name: Publish Modrinth version
-        if: env.PUBLISH_MODRINTH_VERSION == 'true'
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_VERSION_TYPE: ${{ env.MODRINTH_VERSION_TYPE }}
