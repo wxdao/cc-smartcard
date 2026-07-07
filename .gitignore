@@ -26,6 +26,10 @@ hs_err_pid*
 replay_pid*
 *.hprof
 
+# Python helper scripts
+__pycache__/
+*.pyc
+
 # OS files
 .DS_Store
 Thumbs.db
