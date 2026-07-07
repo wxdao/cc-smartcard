@@ -40,6 +40,7 @@ The tag workflow runs `./gradlew clean` and then `./gradlew build runGameTestSer
 ## Manual Publishing
 
 The `Publish to Modrinth` workflow can also be run manually with `workflow_dispatch`.
+To sync only the Modrinth project body from `README.md`, run it with `sync_body=true` and `publish_version=false`.
 
 Manual runs can choose:
 

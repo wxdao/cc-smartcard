@@ -4,8 +4,6 @@ CC SmartCard is a CC: Tweaked add-on for Minecraft 1.21.1 on NeoForge. It adds p
 
 The core idea is simple: place a blank card in a reader, issue a Lua program onto it once, and then call that program through the reader. Card files live in a world-backed private file system. Computers can call the card, but they cannot browse or copy the card's contents through the reader API.
 
-This is intended as a gameplay-level privacy boundary for ComputerCraft programs, not a formal cryptographic security system.
-
 ## Features
 
 - Smart Card item with public card ID, optional label, and issued/blank state.
@@ -311,7 +309,6 @@ end
 
 ## Known Limitations
 
-- Card privacy is intended for normal gameplay and ComputerCraft scripts, not as a formal cryptographic security system.
 - Issuing is one-way through the reader API. There is no supported reissue or erase flow.
 - Card programs are non-transactional. If a program writes files and then errors, earlier writes may remain.
 - Card programs use CC: Tweaked internals for their independent runtime. Future CC: Tweaked updates may require compatibility work.

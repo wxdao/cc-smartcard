@@ -18,6 +18,10 @@ on:
         description: Sync README.md to the Modrinth project body
         type: boolean
         default: true
+      publish_version:
+        description: Publish a Modrinth version
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -44,13 +48,16 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             version_type="${{ inputs.version_type }}"
             sync_body="${{ inputs.sync_body }}"
+            publish_version="${{ inputs.publish_version }}"
           else
             version_type="beta"
             sync_body="true"
+            publish_version="true"
           fi
 
           echo "MODRINTH_VERSION_TYPE=${version_type:-beta}" >> "${GITHUB_ENV}"
           echo "SYNC_MODRINTH_BODY=${sync_body:-true}" >> "${GITHUB_ENV}"
+          echo "PUBLISH_MODRINTH_VERSION=${publish_version:-true}" >> "${GITHUB_ENV}"
 
       - name: Verify tag matches Gradle version
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -81,6 +88,7 @@ jobs:
         run: ./gradlew modrinthSyncBody
 
       - name: Publish Modrinth version
+        if: env.PUBLISH_MODRINTH_VERSION == 'true'
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_VERSION_TYPE: ${{ env.MODRINTH_VERSION_TYPE }}
