@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 - Smart Card Texture Cleanup
+
+### Fixed
+
+- Removed the dark outer shadow from the Smart Card textures so dyed cards render cleaner in hand and in readers.
+
 ## 0.4.0 - Card Runtime Entropy
 
 ### Added
