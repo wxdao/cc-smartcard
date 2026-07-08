@@ -129,18 +129,20 @@ The `smartcard` module is intended for computer-side issuing through a reader. I
 
 The Fingerprint Scanner is a separate CC: Tweaked peripheral for systems that need a live player scan instead of only an item token. Place it next to a computer or connect it with a wired modem, then wrap the peripheral type `fingerprint_scanner`.
 
-When a computer calls `scan()`, the Lua coroutine waits until a player right-clicks the scanner. The block briefly lights the face that was scanned and returns the scanned player's UUID and current game profile name.
+When a computer calls `scan()`, the Lua coroutine waits until a player right-clicks the scanner. The block briefly lights the face that was scanned and returns a table containing the scanned player's UUID and current game profile name.
 
 ```lua
 local scanner = peripheral.find("fingerprint_scanner")
 assert(scanner, "No Fingerprint Scanner found")
 
 print("Waiting for scan...")
-local playerUuid, playerName = scanner.scan()
-print(("Scanned %s (%s)"):format(playerName, playerUuid))
+local scan, err = scanner.scan()
+assert(scan, err)
+
+print(("Scanned %s (%s)"):format(scan.name, scan.uuid))
 ```
 
-If the scanner is removed or the computer detaches while a scan is pending, the pending scan is cancelled and `scan()` raises an error.
+If the scanner is removed or the computer detaches while a scan is pending, the pending scan is cancelled and `scan()` returns `nil, "scan cancelled"`.
 
 ## Use Case Ideas
 
@@ -295,12 +297,15 @@ Waits until a player right-clicks the scanner.
 On success, returns:
 
 ```lua
-playerUuid, playerName
+{
+  uuid = playerUuid,
+  name = playerName,
+}
 ```
 
 `playerUuid` is the scanned player's UUID string. `playerName` is the player's current game profile name.
 
-If the scanner is broken, replaced, or detached before a player scans it, the pending call is cancelled and raises `scan cancelled`.
+If the scanner is broken, replaced, or detached before a player scans it, the pending call is cancelled and returns `nil, "scan cancelled"`.
 
 ## Card Program Layout
 

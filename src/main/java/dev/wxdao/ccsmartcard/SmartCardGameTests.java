@@ -589,7 +589,7 @@ public final class SmartCardGameTests {
         peripheral.detach(computer);
 
         Object[] cancelEvent = computer.pollEvent("fingerprint_scanner_scan_complete");
-        pendingScan.assertErrors(helper, cancelEvent, "scan cancelled", "detached fingerprint scan");
+        pendingScan.assertCancelled(helper, cancelEvent, "detached fingerprint scan");
         helper.succeed();
     }
 
@@ -608,7 +608,7 @@ public final class SmartCardGameTests {
 
         helper.succeedWhen(() -> {
             Object[] cancelEvent = computer.pollEvent("fingerprint_scanner_scan_complete");
-            pendingScan.assertErrors(helper, cancelEvent, "scan cancelled", "replaced fingerprint scanner scan");
+            pendingScan.assertCancelled(helper, cancelEvent, "replaced fingerprint scanner scan");
         });
     }
 
@@ -683,11 +683,13 @@ public final class SmartCardGameTests {
     }
 
     private static void assertPlayerIdentity(GameTestHelper helper, ServerPlayer player, Object[] values) {
-        helper.assertTrue(values.length == 2, "scanner.scan should return UUID and name, got: " + Arrays.toString(values));
-        helper.assertTrue(player.getUUID().toString().equals(values[0]),
-                "scanner.scan returned wrong UUID: " + Arrays.toString(values));
-        helper.assertTrue(player.getGameProfile().getName().equals(values[1]),
-                "scanner.scan returned wrong player name: " + Arrays.toString(values));
+        helper.assertTrue(values.length == 1 && values[0] instanceof Map<?, ?>,
+                "scanner.scan should return a player identity table, got: " + Arrays.toString(values));
+        Map<?, ?> identity = (Map<?, ?>) values[0];
+        helper.assertTrue(player.getUUID().toString().equals(identity.get("uuid")),
+                "scanner.scan returned wrong UUID: " + identity);
+        helper.assertTrue(player.getGameProfile().getName().equals(identity.get("name")),
+                "scanner.scan returned wrong player name: " + identity);
     }
 
     private static final class PendingCall {
@@ -745,15 +747,10 @@ public final class SmartCardGameTests {
             }
         }
 
-        private void assertErrors(GameTestHelper helper, Object[] event, String expectedMessage, String operation) {
-            try {
-                helper.assertTrue(event != null, operation + " has not queued cancellation yet");
-                call.getCallback().resume(event);
-                helper.fail(operation + " completed instead of raising a Lua error");
-            } catch (LuaException e) {
-                helper.assertTrue(expectedMessage.equals(e.getMessage()),
-                        operation + " raised wrong error: " + e.getMessage());
-            }
+        private void assertCancelled(GameTestHelper helper, Object[] event, String operation) {
+            Object[] values = completedResult(helper, event, operation);
+            helper.assertTrue(values.length == 2 && values[0] == null && "scan cancelled".equals(values[1]),
+                    operation + " should return nil and scan cancelled, got: " + Arrays.toString(values));
         }
     }
 

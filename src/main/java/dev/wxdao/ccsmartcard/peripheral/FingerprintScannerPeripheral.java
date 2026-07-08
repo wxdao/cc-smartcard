@@ -2,13 +2,13 @@ package dev.wxdao.ccsmartcard.peripheral;
 
 import dev.wxdao.ccsmartcard.block.entity.FingerprintScannerBlockEntity;
 import dan200.computercraft.api.lua.ILuaCallback;
-import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
 import dan200.computercraft.api.lua.MethodResult;
 import dan200.computercraft.api.peripheral.IComputerAccess;
 import dan200.computercraft.api.peripheral.IPeripheral;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class FingerprintScannerPeripheral implements IPeripheral {
@@ -77,8 +77,7 @@ public final class FingerprintScannerPeripheral implements IPeripheral {
         return MethodResult.pullEvent(SCAN_COMPLETE_EVENT, callback);
     }
 
-    private MethodResult resumeScan(long baselineScanSequence, long baselineCancelSequence, Object[] event)
-            throws LuaException {
+    private MethodResult resumeScan(long baselineScanSequence, long baselineCancelSequence, Object[] event) {
         int offset = event.length >= 1 && SCAN_COMPLETE_EVENT.equals(event[0]) ? 1 : 0;
         if (event.length < offset + 5 || !Long.valueOf(instanceId).equals(asLong(event[offset]))) {
             return waitForScan(baselineScanSequence, baselineCancelSequence);
@@ -91,10 +90,12 @@ public final class FingerprintScannerPeripheral implements IPeripheral {
             if (event.length < offset + 6) {
                 return waitForScan(baselineScanSequence, baselineCancelSequence);
             }
-            return MethodResult.of(event[offset + 4], event[offset + 5]);
+            return MethodResult.of(Map.of(
+                    "uuid", event[offset + 4],
+                    "name", event[offset + 5]));
         }
         if (!success && eventCancelSequence > baselineCancelSequence) {
-            throw new LuaException(String.valueOf(event[offset + 4]));
+            return MethodResult.of(null, String.valueOf(event[offset + 4]));
         }
         return waitForScan(baselineScanSequence, baselineCancelSequence);
     }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 - Fingerprint Scan Result Table
+
+### Changed
+
+- `fingerprint_scanner.scan()` now returns a player identity table `{ uuid, name }` on success.
+- Cancelled scans now return `nil, "scan cancelled"` instead of raising, so error values no longer collide with identity values.
+
 ## 0.4.1 - Smart Card Texture Cleanup
 
 ### Fixed
