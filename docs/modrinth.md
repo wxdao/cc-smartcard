@@ -64,8 +64,12 @@ Card programs receive their own file storage and may use familiar ComputerCraft 
 - Loyalty and coupon cards
 - Two-factor systems combining a Smart Card with a live fingerprint scan
 
+## Crafting
+
+![The crafting recipes for the Smart Card, Smart Card Reader, and Fingerprint Scanner](https://raw.githubusercontent.com/wxdao/cc-smartcard/main/docs/images/crafting-recipes.png)
+
 <details>
-<summary><strong>Crafting recipes</strong></summary>
+<summary><strong>Text recipe reference</strong></summary>
 
 ### Smart Card
 
