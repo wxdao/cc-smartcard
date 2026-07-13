@@ -110,7 +110,7 @@ modrinth {
     dependencies {
         required.project 'cc-tweaked'
     }
-    syncBodyFrom = layout.projectDirectory.file('README.md').asFile.text
+    syncBodyFrom = layout.projectDirectory.file('docs/modrinth.md').asFile.text
 }
 
 tasks.withType(ProcessResources).configureEach {

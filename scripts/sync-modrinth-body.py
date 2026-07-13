@@ -35,7 +35,7 @@ def run(command, cwd):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sync README.md to the Modrinth project body.")
+    parser = argparse.ArgumentParser(description="Sync docs/modrinth.md to the Modrinth project body.")
     parser.add_argument("--dry-run", action="store_true", help="Show what would run without calling Gradle.")
     args = parser.parse_args()
 

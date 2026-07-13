@@ -44,7 +44,7 @@ GitHub Actions uses two cache layers for release builds. `gradle/actions/setup-g
 
 ## Syncing The Modrinth Body
 
-Sync the Modrinth project body from `README.md` locally instead of through GitHub Actions:
+Sync the Modrinth project body from `docs/modrinth.md` locally instead of through GitHub Actions. The description uses images from the repository's `main` branch, so push image changes before running the sync:
 
 ```console
 python3 scripts/sync-modrinth-body.py
