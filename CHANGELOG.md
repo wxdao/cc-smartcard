@@ -10,12 +10,6 @@
 - Added Gate Cabinet and Passage Sensor recipes, models, translations, domain language, ADRs, and implementation documentation.
 - Added self-drop loot tables for all player-placeable device blocks.
 
-### Fixed
-
-- Prevented stale Gate Cabinet state from overriding newer commands or Fail-Open progress when a cross-chunk pair reloads.
-- Made the `obstructed` Gate State queryable during automatic reversal.
-- Deduplicated shared gate events when one ComputerCraft computer is attached through both cabinets.
-
 ## 0.5.0 - Fingerprint Scan Result Table
 
 ### Changed
