@@ -46,6 +46,7 @@ def readCurrentChangelog = {
 }
 
 def currentChangelog = readCurrentChangelog()
+def modrinthSummary = layout.projectDirectory.file('docs/modrinth-summary.txt').asFile.text.trim()
 
 repositories {
     maven {
@@ -125,6 +126,7 @@ tasks.withType(ProcessResources).configureEach {
             mod_name               : mod_name,
             mod_license            : mod_license,
             mod_version            : mod_version,
+            mod_description        : modrinthSummary,
     ]
     inputs.properties replaceProperties
 

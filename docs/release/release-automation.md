@@ -42,13 +42,24 @@ Manual runs publish only a Modrinth version and do not create a GitHub Release. 
 
 GitHub Actions uses two cache layers for release builds. `gradle/actions/setup-gradle` caches Gradle User Home; tag builds read that cache, while `main` and manual runs can write it so the default branch stays warm. A separate `actions/cache` entry stores NeoGradle/UserDev workspace state from `.gradle/repositories`, `.gradle/caches/minecraft`, and `build/neoForm`, keyed by runner OS, MC/NeoForge/CC:T/Parchment versions, and Gradle build configuration files. Tag builds restore this cache but do not save tag-scoped entries. The key is intentionally not based on `mod_version`, because release version bumps do not invalidate the NeoGradle workspace. If these caches miss or expire, the next `main` or manual run will rebuild and prewarm them.
 
-## Syncing The Modrinth Body
+## Syncing Modrinth Metadata
 
-Sync the Modrinth project body from `docs/modrinth.md` locally instead of through GitHub Actions. The description uses images from the repository's `main` branch, so push image changes before running the sync:
+Sync the Modrinth project body from `docs/modrinth.md` locally instead of through GitHub Actions. The description uses
+images from the repository's `main` branch, so push image changes before running the sync:
 
 ```console
 python3 scripts/sync-modrinth-body.py
 ```
+
+The short Summary in `docs/modrinth-summary.txt` is intentionally not updated by default. Include it only when the
+matching feature release is being published:
+
+```console
+python3 scripts/sync-modrinth-body.py --include-summary
+```
+
+Both commands are deliberately local-only operations. The automated version-publishing workflow never updates the
+project body or Summary; they must be reviewed and synced manually at the desired time.
 
 The script loads `.env` from the repository root when it exists, so local tokens can be stored there. This local token needs `PROJECT_WRITE`:
 
@@ -60,7 +71,11 @@ Use `--dry-run` to check the command without syncing:
 
 ```console
 python3 scripts/sync-modrinth-body.py --dry-run
+python3 scripts/sync-modrinth-body.py --include-summary --dry-run
 ```
+
+The same short Summary is injected into `META-INF/neoforge.mods.toml` as the mod description during
+`processResources`, so newly built JARs and the Modrinth project use the same text.
 
 ## Manual Publishing
 

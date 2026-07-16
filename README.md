@@ -485,11 +485,3 @@ else
     print("Access denied")
 end
 ```
-
-## Known Limitations
-
-- Issuing is one-way through the reader API. There is no supported reissue or erase flow.
-- Card programs are non-transactional. If a program writes files and then errors, earlier writes may remain.
-- Card programs use CC: Tweaked internals for their independent runtime. Future CC: Tweaked updates may require compatibility work.
-- The current release targets Minecraft 1.21.1, NeoForge 21.1.235, and CC: Tweaked 1.120.0.
-- The reader API intentionally does not expose raw card file contents.

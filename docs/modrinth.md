@@ -2,7 +2,7 @@
 
 ![A Fingerprint Scanner, CC: Tweaked computer, and Smart Card Reader with an inserted card](https://raw.githubusercontent.com/wxdao/cc-smartcard/main/docs/images/modrinth-hero.png)
 
-**Programmable Smart Cards, identity scanners, and access gates for CC: Tweaked.**
+**Programmable Smart Cards, identity scanners, passage sensors, and access gates for CC: Tweaked.**
 
 CC SmartCard adds player-held cards that can run small Lua programs from private, world-backed storage. Issue a blank card once, insert it into any reader, and call its program through a narrow command interface.
 
