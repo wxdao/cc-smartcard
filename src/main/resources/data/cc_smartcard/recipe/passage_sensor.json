@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "S": {
+      "item": "minecraft:stone"
+    },
+    "C": {
+      "item": "minecraft:copper_ingot"
+    },
+    "R": {
+      "tag": "c:dusts/redstone"
+    },
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "O": {
+      "item": "minecraft:observer"
+    }
+  },
+  "pattern": [
+    "CGC",
+    "ROR",
+    "SSS"
+  ],
+  "result": {
+    "count": 1,
+    "id": "cc_smartcard:passage_sensor"
+  }
+}

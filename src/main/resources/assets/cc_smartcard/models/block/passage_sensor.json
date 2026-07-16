@@ -1,0 +1,46 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "casing": "minecraft:block/smooth_stone",
+    "trim": "minecraft:block/copper_block",
+    "lens": "minecraft:block/observer_front",
+    "particle": "minecraft:block/smooth_stone"
+  },
+  "elements": [
+    {
+      "from": [2, 14, 2],
+      "to": [14, 16, 14],
+      "faces": {
+        "down": { "texture": "#trim" },
+        "up": { "texture": "#casing" },
+        "north": { "texture": "#casing" },
+        "south": { "texture": "#casing" },
+        "west": { "texture": "#casing" },
+        "east": { "texture": "#casing" }
+      }
+    },
+    {
+      "from": [3, 10, 3],
+      "to": [13, 14, 13],
+      "faces": {
+        "down": { "texture": "#trim" },
+        "north": { "texture": "#casing" },
+        "south": { "texture": "#casing" },
+        "west": { "texture": "#casing" },
+        "east": { "texture": "#casing" }
+      }
+    },
+    {
+      "from": [5, 8, 5],
+      "to": [11, 10, 11],
+      "faces": {
+        "down": { "uv": [0, 0, 16, 16], "texture": "#lens" },
+        "north": { "texture": "#trim" },
+        "south": { "texture": "#trim" },
+        "west": { "texture": "#trim" },
+        "east": { "texture": "#trim" }
+      }
+    }
+  ]
+}

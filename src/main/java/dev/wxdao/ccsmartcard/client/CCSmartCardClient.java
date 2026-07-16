@@ -27,5 +27,8 @@ public final class CCSmartCardClient {
         event.registerBlockEntityRenderer(
                 ModBlockEntities.SMART_CARD_READER.get(),
                 SmartCardReaderRenderer::new);
+        event.registerBlockEntityRenderer(
+                ModBlockEntities.GATE_CABINET.get(),
+                GateCabinetRenderer::new);
     }
 }

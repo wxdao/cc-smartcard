@@ -1,0 +1,60 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "casing": "minecraft:block/smooth_stone",
+    "trim": "minecraft:block/copper_block",
+    "dark": "minecraft:block/polished_blackstone",
+    "particle": "minecraft:block/smooth_stone"
+  },
+  "elements": [
+    {
+      "from": [1, 0, 1],
+      "to": [15, 14, 15],
+      "faces": {
+        "down": { "texture": "#dark", "cullface": "down" },
+        "up": { "texture": "#casing" },
+        "north": { "texture": "#casing" },
+        "south": { "texture": "#casing" },
+        "west": { "texture": "#casing" },
+        "east": { "texture": "#casing" }
+      }
+    },
+    {
+      "from": [0.5, 3, 0.5],
+      "to": [15.5, 5, 15.5],
+      "faces": {
+        "down": { "texture": "#trim" },
+        "up": { "texture": "#trim" },
+        "north": { "texture": "#trim" },
+        "south": { "texture": "#trim" },
+        "west": { "texture": "#trim" },
+        "east": { "texture": "#trim" }
+      }
+    },
+    {
+      "from": [0, 14, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "down": { "texture": "#dark" },
+        "up": { "texture": "#trim", "cullface": "up" },
+        "north": { "texture": "#trim", "cullface": "north" },
+        "south": { "texture": "#trim", "cullface": "south" },
+        "west": { "texture": "#trim", "cullface": "west" },
+        "east": { "texture": "#trim", "cullface": "east" }
+      }
+    },
+    {
+      "from": [5, 8, 0],
+      "to": [11, 13, 1],
+      "shade": false,
+      "light_emission": 8,
+      "faces": {
+        "north": { "texture": "#light" },
+        "up": { "texture": "#dark" },
+        "down": { "texture": "#dark" },
+        "west": { "texture": "#dark" },
+        "east": { "texture": "#dark" }
+      }
+    }
+  ]
+}

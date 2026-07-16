@@ -49,6 +49,42 @@ public final class ModBlocks {
             "fingerprint_scanner",
             FINGERPRINT_SCANNER);
 
+    public static final DeferredBlock<GateCabinetBlock> GATE_CABINET = BLOCKS.registerBlock(
+            "gate_cabinet",
+            GateCabinetBlock::new,
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.0F, 8.0F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion());
+
+    public static final DeferredItem<BlockItem> GATE_CABINET_ITEM = ITEMS.registerSimpleBlockItem(
+            "gate_cabinet",
+            GATE_CABINET);
+
+    public static final DeferredBlock<GateBarrierBlock> GATE_BARRIER = BLOCKS.registerBlock(
+            "gate_barrier",
+            GateBarrierBlock::new,
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.NONE)
+                    .strength(-1.0F, 3_600_000.0F)
+                    .sound(SoundType.GLASS)
+                    .noOcclusion()
+                    .noLootTable());
+
+    public static final DeferredBlock<PassageSensorBlock> PASSAGE_SENSOR = BLOCKS.registerBlock(
+            "passage_sensor",
+            PassageSensorBlock::new,
+            BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion());
+
+    public static final DeferredItem<BlockItem> PASSAGE_SENSOR_ITEM = ITEMS.registerSimpleBlockItem(
+            "passage_sensor",
+            PASSAGE_SENSOR);
+
     public static final DeferredItem<SmartCardItem> SMART_CARD = ITEMS.register(
             "smart_card",
             () -> new SmartCardItem(new Item.Properties().stacksTo(64)));
@@ -65,6 +101,8 @@ public final class ModBlocks {
                         }
                         output.accept(SMART_CARD_READER_ITEM.get());
                         output.accept(FINGERPRINT_SCANNER_ITEM.get());
+                        output.accept(GATE_CABINET_ITEM.get());
+                        output.accept(PASSAGE_SENSOR_ITEM.get());
                     })
                     .build());
 

@@ -1,0 +1,9 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "cc_smartcard:block/gate_barrier"
+      }
+    }
+  ]
+}

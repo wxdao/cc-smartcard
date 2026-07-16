@@ -1,6 +1,6 @@
 # CC SmartCard
 
-CC SmartCard is a CC: Tweaked add-on for Minecraft 1.21.1 on NeoForge. It adds programmable Smart Cards, a Smart Card Reader peripheral, and a Fingerprint Scanner peripheral for ComputerCraft-style access cards, tokens, identity checks, and small sealed programs.
+CC SmartCard is a CC: Tweaked add-on for Minecraft 1.21.1 on NeoForge. It adds programmable Smart Cards, identity peripherals, and computer-controlled access gates for ComputerCraft-style credentials, identity checks, secure passages, and small sealed programs.
 
 The core idea is simple: place a blank card in a reader, issue a Lua program onto it once, and then call that program through the reader. Card files live in a world-backed private file system. Computers can call the card, but they cannot browse or copy the card's contents through the reader API.
 
@@ -10,6 +10,8 @@ The core idea is simple: place a blank card in a reader, issue a Lua program ont
 - Dyeable Smart Cards with a coloured card body and gold contact chip.
 - Smart Card Reader block and CC: Tweaked peripheral.
 - Fingerprint Scanner block and CC: Tweaked peripheral for player identity scans.
+- Paired Gate Cabinet blocks with animated glass leaves and an `access_gate` peripheral.
+- Passage Sensor peripheral with configurable anonymous entity detection.
 - Insert a Smart Card by right-clicking any face of the reader with the card. Remove it by right-clicking the reader again.
 - Cards can be issued from a single Lua source string or from a table of files.
 - Issued cards cannot be reissued through the reader API.
@@ -78,6 +80,42 @@ Where:
 - `R` = Redstone Dust, using the `c:dusts/redstone` tag
 - `G` = Glass Pane
 
+### Gate Cabinets
+
+Shaped recipe producing two cabinets:
+
+```text
+SGS
+PRP
+SCS
+```
+
+Where:
+
+- `S` = Stone
+- `G` = Glass Pane
+- `P` = Piston
+- `R` = Redstone Dust, using the `c:dusts/redstone` tag
+- `C` = Copper Ingot
+
+### Passage Sensor
+
+Shaped recipe:
+
+```text
+CGC
+ROR
+SSS
+```
+
+Where:
+
+- `S` = Stone
+- `C` = Copper Ingot
+- `G` = Glass Pane
+- `R` = Redstone Dust, using the `c:dusts/redstone` tag
+- `O` = Observer
+
 ## Quick Start
 
 1. Craft a Smart Card and a Smart Card Reader.
@@ -143,6 +181,33 @@ print(("Scanned %s (%s)"):format(scan.name, scan.uuid))
 ```
 
 If the scanner is removed or the computer detaches while a scan is pending, the pending scan is cancelled and `scan()` returns `nil, "scan cancelled"`.
+
+## Access Gates and Passage Sensors
+
+![An automated two-gate passage closing the entrance, waiting for approval, opening the exit, and resetting](docs/images/access-gate-demo.gif)
+
+The demonstration uses two independent Access Gates and one Passage Sensor. The facility program starts with the
+entrance open and exit closed, closes the entrance after one player enters, waits for approval at the computer, opens
+the exit, and finally closes the exit and reopens the entrance after the passage is empty. This interlock policy lives
+in Lua, so builders can replace it with their own authentication and traffic rules.
+
+Place two Gate Cabinets facing each other with a one- or two-block clear gap. They pair automatically into one Access Gate. Both cabinets expose the same shared gate state, although they may have different ComputerCraft attachment names.
+
+```text
+[cabinet][one- or two-block passage][cabinet]
+```
+
+An Access Gate opens and closes over 10 game ticks. Its glass leaves reverse and reopen if a player, creature, armour stand, or vehicle obstructs them. Gate Cabinets ignore redstone and direct player interaction cannot move them.
+
+The `obstructed` state remains queryable for two server ticks while reversal starts. If the same ComputerCraft computer
+is attached through both cabinets, shared gate events are delivered once to that computer; different computers each
+receive the event.
+
+Gates fail open: when the final attached computer disconnects, the gate waits 20 game ticks and then opens unless a computer reconnects. Two gates do not enforce a hardware interlock; a facility program must coordinate them.
+The cabinets persist versioned copies of their shared state, so a newer command or fail-open transition made while the
+other cabinet's chunk is unloaded wins when the pair is loaded together again.
+
+Mount a Passage Sensor on the ceiling between two gates. It reports anonymous observations of entities in a configurable area. It never returns player UUIDs, names, inventories, equipment, or NBT. See [the full assembly and behaviour design](docs/access-gates.md) for the complete model.
 
 ## Use Case Ideas
 
@@ -306,6 +371,66 @@ On success, returns:
 `playerUuid` is the scanned player's UUID string. `playerName` is the player's current game profile name.
 
 If the scanner is broken, replaced, or detached before a player scans it, the pending call is cancelled and returns `nil, "scan cancelled"`.
+
+## Access Gate API
+
+Each paired Gate Cabinet exposes the peripheral type `access_gate`.
+
+### `getGateId()`
+
+Returns the shared opaque Gate ID, or `nil` while the cabinet is unpaired.
+
+### `getState()`
+
+Returns one of `closed`, `opening`, `open`, `closing`, `obstructed`, or `unpaired`.
+
+### `getWidth()`
+
+Returns the clear passage width, either `1` or `2`, or `0` while unpaired.
+
+### `open()` and `close()`
+
+Accept an asynchronous movement command and return `true`. An unpaired cabinet returns `nil, "unpaired"`. Repeating the current target is idempotent, while the opposite command reverses movement from its current position.
+
+Events:
+
+- `access_gate_state_changed(gateId, oldState, newState)`
+- `access_gate_obstructed(gateId)`
+
+## Passage Sensor API
+
+The Passage Sensor peripheral type is `passage_sensor`.
+
+### `getArea()`
+
+Returns `{ minimum = { x, y, z }, maximum = { x, y, z } }` using block offsets relative to the sensor.
+
+### `setArea(minimum, maximum)`
+
+Sets an inclusive, axis-aligned Detection Area. Each boundary coordinate must be between `-8` and `8`, and total volume must not exceed 256 blocks. Changing the area resets all previous observation tokens.
+
+### `getEntities()`
+
+Returns the current anonymous Entity Observations. Each observation contains:
+
+```lua
+{
+  token = "temporary-sensor-token",
+  type = "minecraft:player",
+  category = "player",
+  position = { x = 0, y = -2, z = 1 },
+  velocity = { x = 0, y = 0, z = 0.1 },
+  size = { width = 0.6, height = 1.8 },
+}
+```
+
+The sensor observes all entities except spectator players and scans every game tick while at least one computer is attached.
+
+Events:
+
+- `passage_entity_entered(sensorName, observation)`
+- `passage_entity_left(sensorName, token)`
+- `passage_sensor_reset(sensorName)`
 
 ## Card Program Layout
 

@@ -2,12 +2,18 @@ package dev.wxdao.ccsmartcard;
 
 import dev.wxdao.ccsmartcard.block.ModBlocks;
 import dev.wxdao.ccsmartcard.block.FingerprintScannerBlock;
+import dev.wxdao.ccsmartcard.block.GateBarrierBlock;
+import dev.wxdao.ccsmartcard.block.GateCabinetBlock;
 import dev.wxdao.ccsmartcard.block.SmartCardReaderBlock;
 import dev.wxdao.ccsmartcard.block.entity.FingerprintScannerBlockEntity;
+import dev.wxdao.ccsmartcard.block.entity.GateCabinetBlockEntity;
+import dev.wxdao.ccsmartcard.block.entity.PassageSensorBlockEntity;
 import dev.wxdao.ccsmartcard.block.entity.SmartCardReaderBlockEntity;
 import dev.wxdao.ccsmartcard.item.CardColours;
 import dev.wxdao.ccsmartcard.item.SmartCardItem;
 import dev.wxdao.ccsmartcard.peripheral.FingerprintScannerPeripheral;
+import dev.wxdao.ccsmartcard.peripheral.AccessGatePeripheral;
+import dev.wxdao.ccsmartcard.peripheral.PassageSensorPeripheral;
 import dev.wxdao.ccsmartcard.peripheral.SmartCardReaderPeripheral;
 import dan200.computercraft.api.filesystem.Mount;
 import dan200.computercraft.api.filesystem.WritableMount;
@@ -25,7 +31,9 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -40,6 +48,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @GameTestHolder(CCSmartCard.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -637,6 +646,277 @@ public final class SmartCardGameTests {
                 "Fingerprint Scanner should clear its light after 10 ticks from the last scan"));
     }
 
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void accessGatesPairAcrossOneOrTwoBlocks(GameTestHelper helper) {
+        BlockPos narrowLeft = new BlockPos(0, 0, 0);
+        BlockPos narrowRight = new BlockPos(2, 0, 0);
+        BlockPos wideLeft = new BlockPos(0, 0, 3);
+        BlockPos wideRight = new BlockPos(3, 0, 3);
+        helper.setBlock(narrowLeft, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.EAST));
+        helper.setBlock(narrowRight, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.WEST));
+        helper.setBlock(wideLeft, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.EAST));
+        helper.setBlock(wideRight, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.WEST));
+
+        helper.succeedWhen(() -> {
+            GateCabinetBlockEntity narrowA = helper.getBlockEntity(narrowLeft);
+            GateCabinetBlockEntity narrowB = helper.getBlockEntity(narrowRight);
+            GateCabinetBlockEntity wideA = helper.getBlockEntity(wideLeft);
+            GateCabinetBlockEntity wideB = helper.getBlockEntity(wideRight);
+
+            helper.assertTrue(narrowA.getGateWidth() == 1 && narrowB.getGateWidth() == 1,
+                    "One-block cabinets should form a width-1 Access Gate");
+            helper.assertTrue(wideA.getGateWidth() == 2 && wideB.getGateWidth() == 2,
+                    "Two-block cabinets should form a width-2 Access Gate");
+            helper.assertTrue(narrowA.getGateId() != null && narrowA.getGateId().equals(narrowB.getGateId()),
+                    "Both narrow cabinets should expose the same Gate ID");
+            helper.assertTrue(wideA.getGateId() != null && wideA.getGateId().equals(wideB.getGateId()),
+                    "Both wide cabinets should expose the same Gate ID");
+            helper.assertFalse(narrowA.getGateId().equals(wideA.getGateId()),
+                    "Different cabinet pairs should have different Gate IDs");
+            helper.assertTrue("open".equals(narrowA.getGateState()) && "open".equals(wideA.getGateState()),
+                    "New Access Gates should assemble open");
+            helper.assertTrue(helper.getBlockState(new BlockPos(1, 0, 0)).is(ModBlocks.GATE_BARRIER.get()),
+                    "Narrow Access Gate should create its managed barrier");
+            helper.assertTrue(helper.getBlockState(new BlockPos(1, 0, 3)).is(ModBlocks.GATE_BARRIER.get())
+                            && helper.getBlockState(new BlockPos(2, 0, 3)).is(ModBlocks.GATE_BARRIER.get()),
+                    "Wide Access Gate should create both managed barriers");
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void accessGateMovesInTenTicksAndFailsOpen(GameTestHelper helper) {
+        BlockPos left = new BlockPos(0, 0, 0);
+        BlockPos right = new BlockPos(2, 0, 0);
+        helper.setBlock(left, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.EAST));
+        helper.setBlock(right, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.WEST));
+        FakeComputerAccess computer = new FakeComputerAccess();
+
+        helper.runAfterDelay(5, () -> {
+            GateCabinetBlockEntity cabinet = helper.getBlockEntity(left);
+            helper.assertTrue(cabinet.isPaired(), "Access Gate should pair before receiving a close command");
+            AccessGatePeripheral peripheral = (AccessGatePeripheral) cabinet.getPeripheral(Direction.NORTH);
+            peripheral.attach(computer);
+            assertSuccessful(helper, peripheral.close(), "gate.close");
+        });
+        helper.runAfterDelay(16, () -> {
+            GateCabinetBlockEntity leftCabinet = helper.getBlockEntity(left);
+            GateCabinetBlockEntity rightCabinet = helper.getBlockEntity(right);
+            helper.assertTrue("closed".equals(leftCabinet.getGateState())
+                            && "closed".equals(rightCabinet.getGateState()),
+                    "Access Gate should finish closing after ten movement ticks");
+            helper.assertTrue(helper.getBlockState(new BlockPos(1, 0, 0))
+                            .getValue(GateBarrierBlock.EXTENDED),
+                    "A closed Access Gate should enable its 1.5-block collision barrier");
+            ((AccessGatePeripheral) leftCabinet.getPeripheral(Direction.NORTH)).detach(computer);
+        });
+        helper.runAfterDelay(36, () -> helper.assertTrue(
+                "closed".equals(((GateCabinetBlockEntity) helper.getBlockEntity(left)).getGateState()),
+                "Access Gate should remain closed for the 20-tick disconnect grace period"));
+        helper.runAtTickTime(48, () -> {
+            GateCabinetBlockEntity leftCabinet = helper.getBlockEntity(left);
+            GateCabinetBlockEntity rightCabinet = helper.getBlockEntity(right);
+            helper.assertTrue("open".equals(leftCabinet.getGateState())
+                            && "open".equals(rightCabinet.getGateState()),
+                    "Disconnected Access Gate should fail open after its grace period and movement");
+            helper.assertFalse(helper.getBlockState(new BlockPos(1, 0, 0))
+                            .getValue(GateBarrierBlock.EXTENDED),
+                    "Fail-open should disable barrier collision");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void accessGateKeepsNewerFailOpenStateWhenStaleCabinetReloads(GameTestHelper helper) {
+        BlockPos left = new BlockPos(0, 0, 0);
+        BlockPos right = new BlockPos(2, 0, 0);
+        helper.setBlock(left, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.EAST));
+        helper.setBlock(right, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.WEST));
+        FakeComputerAccess computer = new FakeComputerAccess();
+        CompoundTag[] staleClosedController = new CompoundTag[1];
+
+        helper.runAfterDelay(5, () -> {
+            GateCabinetBlockEntity rightCabinet = helper.getBlockEntity(right);
+            AccessGatePeripheral peripheral = (AccessGatePeripheral) rightCabinet.getPeripheral(Direction.NORTH);
+            peripheral.attach(computer);
+            assertSuccessful(helper, peripheral.close(), "gate.close before simulated split");
+        });
+        helper.runAfterDelay(16, () -> {
+            GateCabinetBlockEntity leftCabinet = helper.getBlockEntity(left);
+            GateCabinetBlockEntity rightCabinet = helper.getBlockEntity(right);
+            helper.assertTrue("closed".equals(leftCabinet.getGateState()),
+                    "Access Gate should be closed before saving stale canonical state");
+            staleClosedController[0] = leftCabinet.saveWithoutMetadata(helper.getLevel().registryAccess());
+            ((AccessGatePeripheral) rightCabinet.getPeripheral(Direction.NORTH)).detach(computer);
+        });
+        helper.runAfterDelay(50, () -> {
+            GateCabinetBlockEntity leftCabinet = helper.getBlockEntity(left);
+            GateCabinetBlockEntity rightCabinet = helper.getBlockEntity(right);
+            helper.assertTrue("open".equals(leftCabinet.getGateState()),
+                    "Access Gate should have reached its newer fail-open state");
+
+            leftCabinet.loadWithComponents(staleClosedController[0], helper.getLevel().registryAccess());
+            helper.assertTrue("closed".equals(leftCabinet.getGateState()),
+                    "Test setup should temporarily restore stale canonical state");
+            helper.assertTrue(rightCabinet.isPaired(), "Non-canonical cabinet should retain the paired gate state");
+        });
+        helper.runAtTickTime(52, () -> {
+            GateCabinetBlockEntity leftCabinet = helper.getBlockEntity(left);
+            GateCabinetBlockEntity rightCabinet = helper.getBlockEntity(right);
+            helper.assertTrue("open".equals(leftCabinet.getGateState())
+                            && "open".equals(rightCabinet.getGateState()),
+                    "Loaded pair should reconcile to the newer fail-open state instead of stale canonical NBT");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void accessGateObstructionIsQueryableAndEventsAreDeduplicated(GameTestHelper helper) {
+        BlockPos left = new BlockPos(0, 0, 0);
+        BlockPos right = new BlockPos(2, 0, 0);
+        helper.setBlock(left, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.EAST));
+        helper.setBlock(right, ModBlocks.GATE_CABINET.get().defaultBlockState()
+                .setValue(GateCabinetBlock.FACING, Direction.WEST));
+        helper.spawnWithNoFreeWill(EntityType.COW, new BlockPos(1, 0, 0));
+        FakeComputerAccess sharedComputer = new FakeComputerAccess();
+        FakeComputerAccess otherComputer = new FakeComputerAccess();
+
+        helper.runAfterDelay(5, () -> {
+            GateCabinetBlockEntity leftCabinet = helper.getBlockEntity(left);
+            GateCabinetBlockEntity rightCabinet = helper.getBlockEntity(right);
+            AccessGatePeripheral leftPeripheral = (AccessGatePeripheral) leftCabinet.getPeripheral(Direction.NORTH);
+            AccessGatePeripheral rightPeripheral = (AccessGatePeripheral) rightCabinet.getPeripheral(Direction.NORTH);
+            leftPeripheral.attach(sharedComputer);
+            rightPeripheral.attach(sharedComputer);
+            rightPeripheral.attach(otherComputer);
+            assertSuccessful(helper, leftPeripheral.close(), "obstructed gate.close");
+
+            helper.assertTrue(sharedComputer.countEvents("access_gate_state_changed") == 1,
+                    "One computer attached through both cabinets should receive one state event");
+            helper.assertTrue(otherComputer.countEvents("access_gate_state_changed") == 1,
+                    "A distinct computer should still receive the state event");
+        });
+        helper.runAfterDelay(7, () -> {
+            GateCabinetBlockEntity leftCabinet = helper.getBlockEntity(left);
+            helper.assertTrue("obstructed".equals(leftCabinet.getGateState()),
+                    "getState should expose obstructed for a bounded query window");
+            helper.assertTrue(sharedComputer.countEvents("access_gate_obstructed") == 1,
+                    "A dual-attached computer should receive one obstruction event");
+            helper.assertTrue(otherComputer.countEvents("access_gate_obstructed") == 1,
+                    "A distinct computer should receive the obstruction event");
+        });
+        helper.runAtTickTime(20, () -> {
+            helper.assertTrue("open".equals(
+                            ((GateCabinetBlockEntity) helper.getBlockEntity(left)).getGateState()),
+                    "Obstructed Access Gate should finish reopening after its queryable obstruction state");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void passageSensorHasDefaultAreaAndRejectsInvalidAreas(GameTestHelper helper) {
+        BlockPos sensorPos = new BlockPos(1, 4, 1);
+        helper.setBlock(sensorPos, ModBlocks.PASSAGE_SENSOR.get().defaultBlockState());
+        PassageSensorBlockEntity sensor = helper.getBlockEntity(sensorPos);
+        PassageSensorPeripheral peripheral = (PassageSensorPeripheral) sensor.getPeripheral(Direction.NORTH);
+
+        Map<String, Object> area = peripheral.getArea();
+        helper.assertTrue(Map.of("x", 0, "y", -3, "z", 0).equals(area.get("minimum")),
+                "Passage Sensor minimum should default to the column three blocks below");
+        helper.assertTrue(Map.of("x", 0, "y", -1, "z", 0).equals(area.get("maximum")),
+                "Passage Sensor maximum should default to the block directly below");
+        try {
+            peripheral.setArea(
+                    Map.of("x", -1, "y", -3, "z", -1),
+                    Map.of("x", 1, "y", -1, "z", 1));
+            helper.assertTrue(Map.of("x", -1, "y", -3, "z", -1)
+                            .equals(peripheral.getArea().get("minimum")),
+                    "Passage Sensor should accept a bounded valid cuboid");
+        } catch (LuaException e) {
+            helper.fail("Passage Sensor rejected a valid area: " + e.getMessage());
+        }
+
+        assertAreaRejected(helper, peripheral,
+                Map.of("x", 9, "y", 0, "z", 0), Map.of("x", 9, "y", 0, "z", 0),
+                "boundary beyond eight blocks");
+        assertAreaRejected(helper, peripheral,
+                Map.of("x", -8, "y", 0, "z", -8), Map.of("x", 8, "y", 0, "z", 8),
+                "volume beyond 256 blocks");
+        assertAreaRejected(helper, peripheral,
+                Map.of("x", 1, "y", 0, "z", 0), Map.of("x", 0, "y", 0, "z", 0),
+                "minimum beyond maximum");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void passageSensorObservationsAreAnonymousAndResetAcrossAttachments(GameTestHelper helper) {
+        BlockPos sensorPos = new BlockPos(1, 4, 1);
+        helper.setBlock(sensorPos, ModBlocks.PASSAGE_SENSOR.get().defaultBlockState());
+        helper.spawnWithNoFreeWill(EntityType.COW, new BlockPos(1, 2, 1));
+        PassageSensorBlockEntity sensor = helper.getBlockEntity(sensorPos);
+        PassageSensorPeripheral peripheral = (PassageSensorPeripheral) sensor.getPeripheral(Direction.NORTH);
+        FakeComputerAccess computer = new FakeComputerAccess();
+
+        peripheral.attach(computer);
+        Object[] firstEntry = computer.pollEvent(PassageSensorBlockEntity.ENTERED_EVENT);
+        Map<?, ?> firstObservation = observationFromEvent(helper, firstEntry, "initial sensor attachment");
+        helper.assertTrue("minecraft:cow".equals(firstObservation.get("type"))
+                        && "creature".equals(firstObservation.get("category")),
+                "Passage Sensor should report an entity's public kind and category");
+        helper.assertFalse(firstObservation.containsKey("uuid") || firstObservation.containsKey("name")
+                        || firstObservation.containsKey("nbt") || firstObservation.containsKey("health"),
+                "Entity Observation should not expose identity or gameplay metadata");
+        String firstToken = String.valueOf(firstObservation.get("token"));
+
+        try {
+            peripheral.setArea(
+                    Map.of("x", -1, "y", -3, "z", -1),
+                    Map.of("x", 1, "y", -1, "z", 1));
+        } catch (LuaException e) {
+            helper.fail("Passage Sensor rejected test area: " + e.getMessage());
+        }
+        helper.assertTrue(computer.pollEvent(PassageSensorBlockEntity.RESET_EVENT) != null,
+                "Changing Detection Area should queue passage_sensor_reset");
+        Object[] changedAreaEntry = computer.pollEvent(PassageSensorBlockEntity.ENTERED_EVENT);
+        Map<?, ?> changedAreaObservation = observationFromEvent(helper, changedAreaEntry, "changed sensor area");
+        helper.assertFalse(firstToken.equals(String.valueOf(changedAreaObservation.get("token"))),
+                "Changing Detection Area should invalidate old Observation Tokens");
+
+        String changedAreaToken = String.valueOf(changedAreaObservation.get("token"));
+        peripheral.detach(computer);
+        peripheral.attach(computer);
+        Object[] reattachedEntry = computer.pollEvent(PassageSensorBlockEntity.ENTERED_EVENT);
+        Map<?, ?> reattachedObservation = observationFromEvent(helper, reattachedEntry, "reattached sensor");
+        helper.assertFalse(changedAreaToken.equals(String.valueOf(reattachedObservation.get("token"))),
+                "Ending and restarting continuous detection should create a new Observation Token");
+        helper.succeed();
+    }
+
+    private static void assertAreaRejected(GameTestHelper helper, PassageSensorPeripheral peripheral,
+            Map<String, Object> minimum, Map<String, Object> maximum, String operation) {
+        try {
+            peripheral.setArea(minimum, maximum);
+            helper.fail("Passage Sensor accepted invalid area: " + operation);
+        } catch (LuaException expected) {
+            // Expected validation failure.
+        }
+    }
+
+    private static Map<?, ?> observationFromEvent(
+            GameTestHelper helper, Object[] event, String operation) {
+        helper.assertTrue(event != null && event.length == 3 && event[2] instanceof Map<?, ?>,
+                operation + " should queue an anonymous Entity Observation, got: " + Arrays.toString(event));
+        return (Map<?, ?>) event[2];
+    }
+
     private static ItemStack craft(GameTestHelper helper, ItemStack... stacks) {
         NonNullList<ItemStack> items = NonNullList.withSize(9, ItemStack.EMPTY);
         for (int i = 0; i < stacks.length; i++) {
@@ -755,6 +1035,7 @@ public final class SmartCardGameTests {
     }
 
     private static final class FakeComputerAccess implements IComputerAccess {
+        private static final AtomicInteger NEXT_ID = new AtomicInteger();
         private static final WorkMonitor WORK_MONITOR = new WorkMonitor() {
             @Override
             public boolean canWork() {
@@ -771,6 +1052,7 @@ public final class SmartCardGameTests {
             }
         };
         private final BlockingQueue<Object[]> events = new LinkedBlockingQueue<>();
+        private final int id = NEXT_ID.incrementAndGet();
 
         @Override
         public String mount(String desiredLocation, Mount mount, String driveName) {
@@ -788,7 +1070,7 @@ public final class SmartCardGameTests {
 
         @Override
         public int getID() {
-            return 1;
+            return id;
         }
 
         @Override
@@ -829,6 +1111,16 @@ public final class SmartCardGameTests {
                     return next;
                 }
             }
+        }
+
+        private int countEvents(String event) {
+            int count = 0;
+            for (Object[] queued : events) {
+                if (queued.length >= 1 && event.equals(queued[0])) {
+                    count++;
+                }
+            }
+            return count;
         }
 
     }

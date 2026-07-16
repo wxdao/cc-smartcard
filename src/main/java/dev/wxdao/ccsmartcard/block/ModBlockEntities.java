@@ -2,6 +2,8 @@ package dev.wxdao.ccsmartcard.block;
 
 import dev.wxdao.ccsmartcard.CCSmartCard;
 import dev.wxdao.ccsmartcard.block.entity.FingerprintScannerBlockEntity;
+import dev.wxdao.ccsmartcard.block.entity.GateCabinetBlockEntity;
+import dev.wxdao.ccsmartcard.block.entity.PassageSensorBlockEntity;
 import dev.wxdao.ccsmartcard.block.entity.SmartCardReaderBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -22,6 +24,16 @@ public final class ModBlockEntities {
             BLOCK_ENTITY_TYPES.register("fingerprint_scanner", () -> BlockEntityType.Builder.of(
                     FingerprintScannerBlockEntity::new,
                     ModBlocks.FINGERPRINT_SCANNER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<GateCabinetBlockEntity>> GATE_CABINET =
+            BLOCK_ENTITY_TYPES.register("gate_cabinet", () -> BlockEntityType.Builder.of(
+                    GateCabinetBlockEntity::new,
+                    ModBlocks.GATE_CABINET.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PassageSensorBlockEntity>> PASSAGE_SENSOR =
+            BLOCK_ENTITY_TYPES.register("passage_sensor", () -> BlockEntityType.Builder.of(
+                    PassageSensorBlockEntity::new,
+                    ModBlocks.PASSAGE_SENSOR.get()).build(null));
 
     private ModBlockEntities() {
     }

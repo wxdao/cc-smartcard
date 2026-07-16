@@ -1,0 +1,3 @@
+# Access Gates Fail Open Without a Controller
+
+Newly assembled Access Gates default to open. When the final attached CC computer disconnects, an Access Gate waits 20 game ticks and then changes its target to open if no computer has reattached. A loaded gate which was not already open likewise preserves its restored state for 20 ticks before applying this check, instead of opening immediately during peripheral remount. The short grace period filters transient peripheral and chunk remounts while preserving fail-open behaviour. This favours escape and recoverability over containment: a shared controller or network failure may open both gates of an Interlocked Passage, so the passage's mutual exclusion is deliberately not enforced by autonomous gate hardware.

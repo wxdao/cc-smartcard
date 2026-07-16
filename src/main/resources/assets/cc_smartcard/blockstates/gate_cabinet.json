@@ -1,0 +1,49 @@
+{
+  "variants": {
+    "facing=north,indicator=red": {
+      "model": "cc_smartcard:block/gate_cabinet_red"
+    },
+    "facing=east,indicator=red": {
+      "model": "cc_smartcard:block/gate_cabinet_red",
+      "y": 90
+    },
+    "facing=south,indicator=red": {
+      "model": "cc_smartcard:block/gate_cabinet_red",
+      "y": 180
+    },
+    "facing=west,indicator=red": {
+      "model": "cc_smartcard:block/gate_cabinet_red",
+      "y": 270
+    },
+    "facing=north,indicator=amber": {
+      "model": "cc_smartcard:block/gate_cabinet_amber"
+    },
+    "facing=east,indicator=amber": {
+      "model": "cc_smartcard:block/gate_cabinet_amber",
+      "y": 90
+    },
+    "facing=south,indicator=amber": {
+      "model": "cc_smartcard:block/gate_cabinet_amber",
+      "y": 180
+    },
+    "facing=west,indicator=amber": {
+      "model": "cc_smartcard:block/gate_cabinet_amber",
+      "y": 270
+    },
+    "facing=north,indicator=green": {
+      "model": "cc_smartcard:block/gate_cabinet_green"
+    },
+    "facing=east,indicator=green": {
+      "model": "cc_smartcard:block/gate_cabinet_green",
+      "y": 90
+    },
+    "facing=south,indicator=green": {
+      "model": "cc_smartcard:block/gate_cabinet_green",
+      "y": 180
+    },
+    "facing=west,indicator=green": {
+      "model": "cc_smartcard:block/gate_cabinet_green",
+      "y": 270
+    }
+  }
+}

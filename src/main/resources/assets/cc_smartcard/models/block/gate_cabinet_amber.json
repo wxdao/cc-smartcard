@@ -1,0 +1,6 @@
+{
+  "parent": "cc_smartcard:block/gate_cabinet",
+  "textures": {
+    "light": "minecraft:block/orange_concrete"
+  }
+}

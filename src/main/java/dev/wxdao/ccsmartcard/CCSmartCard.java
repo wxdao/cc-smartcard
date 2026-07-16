@@ -3,6 +3,8 @@ package dev.wxdao.ccsmartcard;
 import dev.wxdao.ccsmartcard.block.ModBlockEntities;
 import dev.wxdao.ccsmartcard.block.ModBlocks;
 import dev.wxdao.ccsmartcard.block.entity.FingerprintScannerBlockEntity;
+import dev.wxdao.ccsmartcard.block.entity.GateCabinetBlockEntity;
+import dev.wxdao.ccsmartcard.block.entity.PassageSensorBlockEntity;
 import dev.wxdao.ccsmartcard.block.entity.SmartCardReaderBlockEntity;
 import dev.wxdao.ccsmartcard.recipe.ModRecipes;
 import dan200.computercraft.api.peripheral.PeripheralCapability;
@@ -36,6 +38,14 @@ public final class CCSmartCard {
                 PeripheralCapability.get(),
                 ModBlockEntities.FINGERPRINT_SCANNER.get(),
                 FingerprintScannerBlockEntity::getPeripheral);
+        event.registerBlockEntity(
+                PeripheralCapability.get(),
+                ModBlockEntities.GATE_CABINET.get(),
+                GateCabinetBlockEntity::getPeripheral);
+        event.registerBlockEntity(
+                PeripheralCapability.get(),
+                ModBlockEntities.PASSAGE_SENSOR.get(),
+                PassageSensorBlockEntity::getPeripheral);
     }
 
     private void registerGameTests(RegisterGameTestsEvent event) {
