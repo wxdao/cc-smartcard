@@ -4,6 +4,8 @@ CC SmartCard is a CC: Tweaked add-on for Minecraft 1.21.1 on NeoForge. It adds p
 
 The core idea is simple: place a blank card in a reader, issue a Lua program onto it once, and then call that program through the reader. Card files live in a world-backed private file system. Computers can call the card, but they cannot browse or copy the card's contents through the reader API.
 
+![A Fingerprint Scanner, CC: Tweaked computer, and Smart Card Reader with an inserted card](docs/images/modrinth-hero.png)
+
 ## Features
 
 - Smart Card item with public card ID, optional label, and issued/blank state.
@@ -32,6 +34,11 @@ Install CC SmartCard on the server. For multiplayer, clients should also install
 
 ## Crafting
 
+![The crafting recipes for the Smart Card, Smart Card Reader, and Fingerprint Scanner](docs/images/crafting-recipes.png)
+
+The visual guide covers the original card and identity blocks. Gate Cabinet and Passage Sensor recipes are included in
+the text reference below.
+
 ### Smart Card
 
 Shapeless recipe:
@@ -40,6 +47,8 @@ Shapeless recipe:
 - Redstone Dust
 - Copper Ingot
 - Optional dye ingredients for a coloured card
+
+![The CC SmartCard creative tab showing white and dyed Smart Cards](docs/images/smart-card-colours.png)
 
 Crafting with no dye produces the default white Smart Card. Crafting with one or more dyes produces a dyed Smart Card, mixing multiple dyes in the same style as CC: Tweaked disks.
 
@@ -164,6 +173,8 @@ assert(smartcard.issueFromFile(reader, "cards/door_token.lua"))
 The `smartcard` module is intended for computer-side issuing through a reader. It does not expose card runtime APIs and does not add reader peripheral methods.
 
 ## Fingerprint Scanner
+
+![A Fingerprint Scanner before and after a successful player scan](docs/images/fingerprint-scanner-states.png)
 
 The Fingerprint Scanner is a separate CC: Tweaked peripheral for systems that need a live player scan instead of only an item token. Place it next to a computer or connect it with a wired modem, then wrap the peripheral type `fingerprint_scanner`.
 
